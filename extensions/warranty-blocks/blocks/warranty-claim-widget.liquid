@@ -1,0 +1,77 @@
+{% doc %}
+  Renders a simple warranty claim widget app block with editable title and
+  description.
+
+  This block is intended to be used as a theme app block and rendered inside
+  supported sections (for example, on the product or account pages).
+
+  All text content is merchant-editable from the theme editor.
+
+  @example
+  {% content_for 'block', type: 'warranty-claim-widget', id: 'warranty-claim-widget' %}
+{% enddoc %}
+
+<div class="warranty-claim-widget" {{ block.shopify_attributes }}>
+  {% if block.settings.title != '' %}
+    <h2 class="warranty-claim-widget__title">
+      {{ block.settings.title | escape }}
+    </h2>
+  {% endif %}
+
+  {% if block.settings.description != '' %}
+    <div class="warranty-claim-widget__description rte">
+      {{ block.settings.description }}
+    </div>
+  {% endif %}
+
+
+    <iframe
+    src="http://localhost:51105/warranty-claims?shop={{ shop.domain }}"
+    title="Warranty Widget"
+    width="100%"
+    height="800"
+    style="border: none;"></iframe>
+</div>
+
+<style>
+  .warranty-claim-widget {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+
+  .warranty-claim-widget__title {
+    margin: 0 0 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .warranty-claim-widget__description {
+    margin: 0;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+</style>
+
+{% schema %}
+{
+  "name": "warranty_claim_widget",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "apps.warranty_claim_widget.settings.title.label",
+      "default": "File a warranty claim"
+    },
+    {
+      "type": "richtext",
+      "id": "description",
+      "label": "apps.warranty_claim_widget.settings.description.label",
+      "default": "<p>Provide your order details and we’ll help you with your warranty claim.</p>"
+    }
+  ]
+}
+{% endschema %}

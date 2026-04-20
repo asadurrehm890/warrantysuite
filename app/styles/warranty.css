@@ -1,0 +1,510 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+
+.warranty-page {
+  max-width: 1000px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  font-family: "Inter", sans-serif;
+  background: #ffffff;
+  
+}
+
+.fulllwwidth{
+  grid-column: span 2;
+}
+
+.warranty-page h1 {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.warranty-page p.paragraph {
+  text-align: center;
+}
+
+.warranty-section {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.warranty-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.warranty-section h2 {
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+  grid-column: span 2;
+  text-align: center;
+}
+
+.warranty-form {
+   display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.email-verification-section .warranty-field{
+  width: 86%;
+}
+
+@media(max-width:767px){
+ .email-verification-section{
+    flex-direction: column;
+    align-items: flex-start !important;
+    width: 100%;
+    grid-column: span 2;
+  }
+  .email-verification-section .warranty-field {
+    width: 100%;
+}
+}
+
+@media (max-width: 992px) {
+  .warranty-form {
+    grid-template-columns: 1fr !important;
+  }
+  .warranty-field{
+    grid-column: span 2;
+  }
+ 
+.flexpara{
+  grid-column: span 2;
+}
+.address-autocomplete-container input{
+  width:95% !important;
+}
+}
+
+.warranty-field {
+
+   display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+      min-width: 0;
+ 
+}
+
+.warranty-field label {
+  font-weight: 500;
+    font-size: .85rem;
+    position: absolute;
+    left: 1rem;
+    top: 1.35rem;
+    display:none;
+}
+.flexpara{
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  font-size: 1em;
+}
+
+.labelupper908 label{
+  position: relative !important;
+    font-size: 1rem !important;
+    display: unset !important;
+    top: 0 !important;
+    left: 0 !important;
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+}
+
+.warranty-field:focus-within label{
+  transition:all 0.5s ease;
+  display: unset;
+  font-weight: 500;
+    font-size: 0.65rem;
+    position: absolute;
+    left: 1rem;
+    top: 0.35rem;
+    animation-name: opacitymove;
+    animation-duration: 1s;
+
+}
+@keyframes opacitymove {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.warranty-input,
+.warranty-select {
+  padding: 1.5rem 1rem 1.2rem 1rem;
+    border-radius: 4px;
+    border: 1px solid rgba(23,23,23,0.025);
+    font-size: .95rem;
+    background-color: rgba(23,23,23,0.025);
+    color: #232323;
+    font-family: "inter", sans-serif;
+}
+
+.warranty-input:focus,
+.warranty-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb33;
+}
+
+.warranty-actions {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  grid-column: span 2;
+}
+
+.warranty-button {
+  padding: 0.5rem 0.9rem;
+  border-radius: 50px;
+  padding: 1rem 2rem;
+  border: none;
+  background: #321414;
+  color: white;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.warranty-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.warranty-button.secondary {
+  background: #321414;
+}
+
+.warranty-status {
+  margin-top: 1rem;
+  font-size: 0.9rem; 
+  padding: 0.5rem 0;
+ 
+}
+
+.warranty-status--error {
+  color: #b91c1c;
+}
+
+.warranty-status--success {
+  color: #15803d;
+}
+
+
+
+/* Verification success message */
+.verification-success {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 0.25rem;
+  border-radius: 4px;
+  border: 1px solid #c3e6cb;
+  margin-top: 1rem;
+}
+
+
+.warranty-button.tertiary {
+  background-color: #6c757d;
+  margin-left: 10px;
+}
+
+.warranty-button.tertiary:hover {
+  background-color: #5a6268;
+}
+
+.otp-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 0;
+}
+
+.verification-success {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+.email-verification-section{
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.otp-actions button{
+    border-radius: 5px;
+    padding: 1rem 1rem !important;
+    height: 64px;
+}
+
+
+.thankyou-section{
+  position : relative;
+  height: 100vh;
+}
+.thankyou-section .position-centered-thankyou{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.postal-address-serach{
+  grid-column: span 2;
+}
+
+
+/* Address Autocomplete Styles */
+.postal-address-search {
+  position: relative;
+  grid-column: span 2;
+}
+
+.address-autocomplete-container {
+  position: relative;
+}
+
+.address-suggestions-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.suggestion-item {
+  padding: 10px 15px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  color: #333;
+}
+
+.suggestion-item:hover {
+  background-color: #f5f5f5;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-main {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.suggestion-details {
+  font-size: 0.9em;
+  color: #666;
+  opacity: 0.8;
+}
+
+.suggestion-loading {
+  padding: 10px 15px;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+  background-color: #f9f9f9;
+}
+
+/* Make sure the autocomplete dropdown appears above other elements */
+.warranty-form {
+  position: relative;
+}
+
+/* Update existing postal-address-search class if needed */
+.postal-address-search .warranty-field {
+  margin-bottom: 0;
+}
+
+.postal-address-search .warranty-actions {
+  margin-top: 10px !important;
+}
+@media (min-width:768px){
+  .postal-address-search .warranty-actions {
+    margin-top: 0px !important;
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}
+/* Remove the "required" styling from search input if you want */
+.postal-address-search input[required] {
+  border-color: #ddd;
+}
+
+.postal-address-search input[required]:invalid {
+  box-shadow: none;
+}
+
+.address-autocomplete-container input{
+  width:96.5%;
+}
+
+.paralast0900009{
+  font-size: 0.65rem;
+  font-style: italic;
+  text-align: center;
+}
+.paralast0900009 a{
+  color:#0b61cd;
+  text-decoration: none;;
+}
+
+#phone_country_code{
+  width: 100% !important;
+  height: 4rem;
+  background-color: #17171706;
+  border: 1px solid rgba(23, 23, 23, 0.025);
+}
+
+
+.phone98008008{
+  flex-direction:row !important;
+  gap:1rem !important;
+}
+
+
+
+.product-typeahead {
+  position: relative;
+}
+
+.product-dropdown {
+  position: absolute;
+  z-index: 10;
+  background: #fff;
+  border: 1px solid #ddd;
+  width: 100%;
+  max-height: 250px;
+  overflow-y: auto;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  top: 71px;
+}
+
+.product-dropdown-item {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.product-dropdown-item:hover,
+.product-dropdown-item.selected {
+  background-color: #f5f5f5;
+}
+
+.product-dropdown-empty {
+  color: #999;
+  cursor: default;
+}
+
+
+/* Phone Input Styles */
+.phone-input-container {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.country-code-selector {
+  flex: 0 0 150px;
+}
+
+.phone-country-select {
+  width: 100%;
+  padding: 12px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.phone-number-input {
+  flex: 1;
+  min-width: 0; /* Important for flexbox to work properly */
+}
+
+.phone-error-message {
+  color: #e74c3c;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Style options in the select dropdown */
+.phone-country-select option {
+  font-size: 14px;
+  padding: 8px;
+}
+
+/* Make sure the dropdown shows flags */
+.phone-country-select {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* For better mobile experience */
+@media (max-width: 768px) {
+  .phone-input-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .country-code-selector {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  
+  .phone-country-select {
+    width: 100%;
+  }
+}
+
+
+.phone98008008 .country-code-selector .css-13cymwt-control, .phone98008008 .country-code-selector .css-t3ipsp-control{
+    height: 64px;
+    background-color: rgba(23, 23, 23, 0.025);
+    border: 1px solid rgba(23, 23, 23, 0.025);
+}
+
+
+.css-1dimb5e-singleValue .ki0490400ki440ki {
+    display: none;
+}
+
+
+.purchase-source-select__control.css-13cymwt-control {
+    height: 64px;
+    background: rgba(0, 0, 0, 0.025);
+    border: none;
+}
+
+.purchase-source-select__control.css-t3ipsp-control {
+    height: 64px;
+    background: rgba(0, 0, 0, 0.025);
+    border: none;
+}

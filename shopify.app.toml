@@ -1,0 +1,156 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "2bb97330f0f169c72ed362ca2b604833"
+name = "warranty-activation-suite"
+application_url = "https://example.com"
+embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
+
+[webhooks]
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
+
+[access_scopes]
+scopes = "write_products,write_customers,write_metaobjects,write_metaobject_definitions,write_files"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+# Metaobject definition: $app:warranty_registration
+[metaobjects.app.warranty_registration]
+name = "Warranty Registration"
+display_name_field = "product_name"
+
+[metaobjects.app.warranty_registration.access]
+admin = "merchant_read_write"
+storefront = "none"
+
+[metaobjects.app.warranty_registration.fields.product_name]
+name = "Product Name"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_registration.fields.customer_email]
+name = "Customer Email"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_registration.fields.purchase_source]
+name = "Purchase Source"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_registration.fields.purchase_date]
+name = "Purchase Date"
+type = "date"
+required = true
+
+[metaobjects.app.warranty_registration.fields.order_number]
+name = "Order / Invoice Number"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_registration.fields.serial_number]
+name = "Product Serial Number"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_registration.fields.warranty_start_date]
+name = "Warranty Start Date"
+type = "date"
+required = false
+
+[metaobjects.app.warranty_registration.fields.warranty_end_date]
+name = "Warranty End Date"
+type = "date"
+required = false
+
+[metaobjects.app.warranty_registration.fields.status]
+name = "Warranty Status"
+type = "single_line_text_field"
+required = false
+
+
+
+# Customer metafield: LIST of references to $app:warranty_registration
+[customer.metafields.app.warranty_registration]
+type = "list.metaobject_reference<$app:warranty_registration>"
+name = "Warranty Registrations"
+
+[customer.metafields.app.warranty_registration.access]
+admin = "merchant_read_write"
+storefront = "none"
+
+
+
+# Metaobject definition: $app:warranty_claim
+[metaobjects.app.warranty_claim]
+name = "Warranty Claim"
+display_name_field = "claim_type"
+
+[metaobjects.app.warranty_claim.access]
+admin = "merchant_read_write"
+storefront = "none"
+
+[metaobjects.app.warranty_claim.fields.customer_email]
+name = "Customer Email"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_claim.fields.customer_id]
+name = "Customer ID"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_claim.fields.warranty_id]
+name = "Warranty ID"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_claim.fields.warranty_details]
+name = "Warranty Details"
+type = "multi_line_text_field"
+required = false
+
+[metaobjects.app.warranty_claim.fields.claim_type]
+name = "Claim Type"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_claim.fields.claim_description]
+name = "Claim Description"
+type = "multi_line_text_field"
+required = true
+
+[metaobjects.app.warranty_claim.fields.file_urls]
+name = "File URLs"
+type = "multi_line_text_field"
+required = false
+
+[metaobjects.app.warranty_claim.fields.status]
+name = "Claim Status"
+type = "single_line_text_field"
+required = true
+
+[metaobjects.app.warranty_claim.fields.submitted_at]
+name = "Submitted At"
+type = "date_time"
+required = true
+
+# Customer metafield: LIST of references to $app:warranty_claim
+[customer.metafields.app.warranty_claims]
+type = "list.metaobject_reference<$app:warranty_claim>"
+name = "Warranty Claims"
+
+[customer.metafields.app.warranty_claims.access]
+admin = "merchant_read_write"
+storefront = "none"

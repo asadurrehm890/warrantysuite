@@ -1,0 +1,95 @@
+{% doc %}
+  Renders a simple warranty widget app block with editable title, description,
+  and bottom text.
+
+  This block is intended to be used as a theme app block and rendered inside
+  supported sections (for example, on the product page).
+
+  All text content is merchant-editable from the theme editor.
+
+  @example
+  {% content_for 'block', type: 'warranty-widget', id: 'warranty-widget' %}
+{% enddoc %}
+
+<div class="warranty-widget" {{ block.shopify_attributes }}>
+  {% if block.settings.title != '' %}
+    <h2 class="warranty-widget__title">
+      {{ block.settings.title | escape }}
+    </h2>
+  {% endif %}
+
+  {% if block.settings.description != '' %}
+    <div class="warranty-widget__description rte">
+      {{ block.settings.description }}
+    </div>
+  {% endif %}
+
+  <iframe
+    src="http://localhost:51105/warranty?shop={{ shop.domain }}"
+    title="Warranty Widget"
+    width="100%"
+    height="800"
+    style="border: none;"></iframe>
+
+  {% if block.settings.bottom_text != '' %}
+    <div class="warranty-widget__bottom-text rte">
+      {{ block.settings.bottom_text }}
+    </div>
+  {% endif %}
+</div>
+
+<style>
+  .warranty-widget {
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+
+  .warranty-widget__title {
+    margin: 0 0 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .warranty-widget__description {
+    margin: 0 0 0.75rem;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+  }
+
+  .warranty-widget__bottom-text {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    opacity: 0.85;
+  }
+</style>
+
+{% schema %}
+{
+  "name": "warranty_widget",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "apps.warranty_widget.settings.title.label",
+      "default": "Extended warranty"
+    },
+    {
+      "type": "richtext",
+      "id": "description",
+      "label": "apps.warranty_widget.settings.description.label",
+      "default": "<p>Protect your purchase with our extended warranty coverage.</p>"
+    },
+    {
+      "type": "richtext",
+      "id": "bottom_text",
+      "label": "apps.warranty_widget.settings.bottom_text.label",
+      "default": "<p>Terms and conditions apply.</p>"
+    }
+  ]
+}
+{% endschema %}

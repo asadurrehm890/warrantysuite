@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+
+
+model PurchaseSource {
+  id        String   @id @default(cuid())
+  shop      String
+  label     String
+  createdAt DateTime @default(now())
+
+  @@index([shop])
+}
+
+
+model WarrantySettings {
+  shop               String   @id
+  marketingText      String?
+  claimMarketingText String?
+
+  brevoApiKey      String?
+  brevoSenderEmail String?
+
+  cloudName         String?  // CLOUDNAME
+  cloudinaryKey     String?  // CLOUDINARY_KEY
+  cloudinarySecret  String?  // CLOUDINARY_SECRET
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
+
+// prisma/schema.prisma - Corrected for SQLite
+
+model EmailTemplate {
+  id          String   @id @default(cuid())
+  shop        String   @map("shop")
+  type        String   // warranty_approved, warranty_disapproved, claim_approved, claim_rejected
+  subject     String
+  htmlContent String   // SQLite uses TEXT by default for String
+  textContent String   // SQLite uses TEXT by default for String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([shop, type])
+  @@map("email_templates")
+}

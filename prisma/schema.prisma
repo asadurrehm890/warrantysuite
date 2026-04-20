@@ -5,12 +5,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -31,9 +28,9 @@ model Session {
   emailVerified Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+
+  @@index([shop])
 }
-
-
 
 model PurchaseSource {
   id        String   @id @default(cuid())
@@ -44,7 +41,6 @@ model PurchaseSource {
   @@index([shop])
 }
 
-
 model WarrantySettings {
   shop               String   @id
   marketingText      String?
@@ -53,27 +49,23 @@ model WarrantySettings {
   brevoApiKey      String?
   brevoSenderEmail String?
 
-  cloudName         String?  // CLOUDNAME
-  cloudinaryKey     String?  // CLOUDINARY_KEY
-  cloudinarySecret  String?  // CLOUDINARY_SECRET
+  cloudName         String?  
+  cloudinaryKey     String?  
+  cloudinarySecret  String?  
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 }
 
-
-// prisma/schema.prisma - Corrected for SQLite
-
 model EmailTemplate {
   id          String   @id @default(cuid())
-  shop        String   @map("shop")
+  shop        String
   type        String   // warranty_approved, warranty_disapproved, claim_approved, claim_rejected
   subject     String
-  htmlContent String   // SQLite uses TEXT by default for String
-  textContent String   // SQLite uses TEXT by default for String
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  htmlContent String   // PostgreSQL TEXT type
+  textContent String   // PostgreSQL TEXT type
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([shop, type])
-  @@map("email_templates")
 }

@@ -2,7 +2,7 @@
 
 client_id = "2bb97330f0f169c72ed362ca2b604833"
 name = "warranty-activation-suite"
-application_url = "https://example.com"
+application_url = "https://warrantysuite.vercel.app"
 embedded = true
 
 [build]
@@ -23,7 +23,7 @@ api_version = "2026-04"
 scopes = "write_products,write_customers,write_metaobjects,write_metaobject_definitions,write_files"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://warrantysuite.vercel.app/api/auth" ]
 
 # Metaobject definition: $app:warranty_registration
 [metaobjects.app.warranty_registration]

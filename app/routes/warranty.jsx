@@ -15,7 +15,8 @@ export default function WarrantyPage() {
   // New states for customer data
   const [checkingCustomer, setCheckingCustomer] = useState(false);
   const [existingCustomerData, setExistingCustomerData] = useState(null);
-  const [showExistingCustomerMessage, setShowExistingCustomerMessage] = useState(false);
+  const [showExistingCustomerMessage, setShowExistingCustomerMessage] =
+    useState(false);
 
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -52,10 +53,15 @@ export default function WarrantyPage() {
   const [selectedPurchaseSource, setSelectedPurchaseSource] = useState(null);
 
   const [shopDomain, setShopDomain] = useState("store.myshopify.com"); // Default value, will be overridden by URL param if present
-  
+
   const [marketingText, setMarketingText] = useState("");
   const [marketingTextLoading, setMarketingTextLoading] = useState(true);
   const [marketingTextError, setMarketingTextError] = useState(null);
+
+  // NEW: Billing status states
+  // null = loading, true = active subscription, false = no active subscription
+  const [billingActive, setBillingActive] = useState(null);
+  const [billingError, setBillingError] = useState(null);
 
   // Fetch marketing consent text
   useEffect(() => {
@@ -84,7 +90,8 @@ export default function WarrantyPage() {
       fetchMarketingText();
     }
   }, [shopDomain]);
-  
+
+  // Read shop from URL
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -96,6 +103,34 @@ export default function WarrantyPage() {
       console.warn("Could not read shop from URL, using default", e);
     }
   }, []);
+
+  // NEW: Check billing status for this shop
+  useEffect(() => {
+    const checkBilling = async () => {
+      if (!shopDomain) return;
+
+      try {
+        setBillingError(null);
+        setBillingActive(null); // reset to loading on shop change
+
+        const res = await fetch(
+          `/api/billing-status?shop=${encodeURIComponent(shopDomain)}`
+        );
+        const data = await res.json();
+        setBillingActive(!!data.active);
+
+        if (!data.active && data.error) {
+          setBillingError(data.error);
+        }
+      } catch (err) {
+        console.error("Error checking billing status:", err);
+        setBillingActive(false);
+        setBillingError("Unable to verify store subscription.");
+      }
+    };
+
+    checkBilling();
+  }, [shopDomain]);
 
   // Fetch purchase sources for this shop
   useEffect(() => {
@@ -129,7 +164,7 @@ export default function WarrantyPage() {
     value: source.label, // what will be submitted in the form
     label: source.label,
   }));
-  
+
   purchaseSourceOptions.push({ value: shopDomain, label: shopDomain }); // Add "Other" option at the end
 
   // Static fallback list for countries - accurate phone codes
@@ -255,7 +290,9 @@ export default function WarrantyPage() {
         const params = new URLSearchParams(window.location.search);
         const shopFromUrl = params.get("shop");
 
-        const res = await fetch("/api/products?shop="+encodeURIComponent(shopFromUrl));
+        const res = await fetch(
+          "/api/products?shop=" + encodeURIComponent(shopFromUrl)
+        );
         if (!res.ok) {
           throw new Error("Failed to load products");
         }
@@ -281,7 +318,7 @@ export default function WarrantyPage() {
   const searchAddresses = async (query) => {
     setIsSearching(true);
     setShowSuggestions(false);
-    
+
     try {
       const response = await fetch(
         `https://api.ideal-postcodes.co.uk/v1/autocomplete/addresses?api_key=${IDEAL_POSTCODES_API_KEY}&query=${encodeURIComponent(
@@ -293,31 +330,31 @@ export default function WarrantyPage() {
 
       if (data.result && data.result.hits && data.result.hits.length > 0) {
         const formattedSuggestions = data.result.hits.map((hit) => {
-          const suggestionParts = hit.suggestion.split(', ');
-          let street = suggestionParts[0] || '';
-          let town = suggestionParts[2] || '';
-          let postalCode = suggestionParts[3] || '';
-          
+          const suggestionParts = hit.suggestion.split(", ");
+          let street = suggestionParts[0] || "";
+          let town = suggestionParts[2] || "";
+          let postalCode = suggestionParts[3] || "";
+
           if (suggestionParts.length > 4) {
-            street = suggestionParts.slice(0, 2).join(', ');
-            town = suggestionParts[2] || '';
-            postalCode = suggestionParts[3] || '';
+            street = suggestionParts.slice(0, 2).join(", ");
+            town = suggestionParts[2] || "";
+            postalCode = suggestionParts[3] || "";
           }
-          
+
           return {
             display_name: hit.suggestion,
             address: {
               road: street,
-              house_number: '',
+              house_number: "",
               city: town,
               town: town,
               country: "United Kingdom",
               postcode: postalCode,
-              ideal_postcodes_hit: hit
-            }
+              ideal_postcodes_hit: hit,
+            },
           };
         });
-        
+
         setAddressSuggestions(formattedSuggestions);
         setShowSuggestions(true);
       } else {
@@ -365,7 +402,7 @@ export default function WarrantyPage() {
   // Handle address selection
   const handleSelectAddress = async (suggestion) => {
     const address = suggestion.address;
-    
+
     let street = "";
     let town = "";
     let country = "";
@@ -373,14 +410,14 @@ export default function WarrantyPage() {
 
     if (address.ideal_postcodes_hit) {
       const hit = address.ideal_postcodes_hit;
-      
+
       try {
         const udprn = hit.udprn;
         const response = await fetch(
           `https://api.ideal-postcodes.co.uk/v1/udprn/${udprn}?api_key=${IDEAL_POSTCODES_API_KEY}`
         );
         const data = await response.json();
-        
+
         if (data.result) {
           const fullAddress = data.result;
           street = fullAddress.line_1 || "";
@@ -391,18 +428,18 @@ export default function WarrantyPage() {
           country = "United Kingdom";
           postalCode = fullAddress.postcode || "";
         } else {
-          const suggestionParts = hit.suggestion.split(', ');
-          street = suggestionParts[0] || '';
-          town = suggestionParts[2] || '';
-          postalCode = suggestionParts[3] || '';
+          const suggestionParts = hit.suggestion.split(", ");
+          street = suggestionParts[0] || "";
+          town = suggestionParts[2] || "";
+          postalCode = suggestionParts[3] || "";
           country = "United Kingdom";
         }
       } catch (error) {
         console.error("Error fetching full address details:", error);
-        const suggestionParts = hit.suggestion.split(', ');
-        street = suggestionParts[0] || '';
-        town = suggestionParts[2] || '';
-        postalCode = suggestionParts[3] || '';
+        const suggestionParts = hit.suggestion.split(", ");
+        street = suggestionParts[0] || "";
+        town = suggestionParts[2] || "";
+        postalCode = suggestionParts[3] || "";
         country = "United Kingdom";
       }
     } else {
@@ -415,7 +452,13 @@ export default function WarrantyPage() {
         street = address.pedestrian;
       }
 
-      town = address.city || address.town || address.village || address.municipality || address.county || "";
+      town =
+        address.city ||
+        address.town ||
+        address.village ||
+        address.municipality ||
+        address.county ||
+        "";
       country = address.country || "";
       postalCode = address.postcode || "";
     }
@@ -473,7 +516,9 @@ export default function WarrantyPage() {
       if (phoneCountryCode.startsWith(value)) {
         setPhoneNumber(phoneCountryCode);
       } else {
-        setPhoneNumber(phoneCountryCode + value.replace(phoneCountryCode, ''));
+        setPhoneNumber(
+          phoneCountryCode + value.replace(phoneCountryCode, "")
+        );
       }
     } else {
       setPhoneNumber(value);
@@ -489,7 +534,7 @@ export default function WarrantyPage() {
 
     const phoneWithoutFormatting = phoneNumber.replace(/[^\d\+]/g, "");
     const digitsOnly = phoneWithoutFormatting.replace(/\D/g, "");
-    
+
     if (digitsOnly.length < 10) {
       setPhoneError("Phone number is too short");
       return false;
@@ -508,11 +553,11 @@ export default function WarrantyPage() {
   const handleCountryCodeChange = (newCode) => {
     const oldCode = phoneCountryCode;
     setPhoneCountryCode(newCode);
-    
+
     if (phoneNumber.startsWith(oldCode)) {
       setPhoneNumber(newCode + phoneNumber.slice(oldCode.length));
     } else {
-      setPhoneNumber(newCode + phoneNumber.replace(/^\+\d+/, ''));
+      setPhoneNumber(newCode + phoneNumber.replace(/^\+\d+/, ""));
     }
   };
 
@@ -525,30 +570,30 @@ export default function WarrantyPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, shop: shopDomain }),
       });
-      
+
       const data = await res.json();
-      
+
       if (res.ok && data.exists) {
         // Customer exists, auto-fill the form
         setExistingCustomerData(data);
-        
+
         // Auto-fill full name if available
         if (data.displayName) {
-          const fullNameInput = document.querySelector('input[name="full_name"]');
+          const fullNameInput = document.querySelector(
+            'input[name="full_name"]'
+          );
           if (fullNameInput) fullNameInput.value = data.displayName;
         }
-        
+
         // Auto-fill phone number if available
         if (data.phone) {
-          // Extract country code and number if needed
           let phoneValue = data.phone;
-          // Check if phone starts with +, if not, add the default country code
-          if (!phoneValue.startsWith('+')) {
+          if (!phoneValue.startsWith("+")) {
             phoneValue = phoneCountryCode + phoneValue;
           }
           setPhoneNumber(phoneValue);
         }
-        
+
         // Auto-fill address if available
         if (data.address) {
           setAddressFields({
@@ -558,21 +603,20 @@ export default function WarrantyPage() {
             postal_code: data.address.postal_code || "",
           });
         }
-        
+
         // Show message and automatically mark email as verified
         setShowExistingCustomerMessage(true);
         setEmailVerified(true);
         setStatus("Existing customer found! Your details have been auto-filled.");
         setStatusType("success");
-        
-        // Hide the message after 5 seconds
+
         setTimeout(() => {
           setShowExistingCustomerMessage(false);
         }, 5000);
-        
+
         return true;
       }
-      
+
       return false;
     } catch (err) {
       console.error("Error checking customer:", err);
@@ -585,24 +629,24 @@ export default function WarrantyPage() {
   // Modified handleSendOtp function
   async function handleSendOtp(e) {
     e.preventDefault();
-    
+
     if (!email.trim()) {
       setStatus("Please enter your email address.");
       setStatusType("error");
       return;
     }
-    
+
     setStatusType(null);
     setStatus("Checking if you're an existing customer...");
-    
+
     // First check if customer exists
     const customerExists = await checkCustomerExists(email);
-    
+
     if (customerExists) {
       // Customer exists and form is auto-filled, no need to send OTP
       return;
     }
-    
+
     // Customer doesn't exist, proceed with OTP sending
     setStatus("Sending OTP...");
     try {
@@ -715,17 +759,22 @@ export default function WarrantyPage() {
     try {
       const params = new URLSearchParams(window.location.search);
       const shopFromUrl = params.get("shop");
-      const res = await fetch(`/api/submit-warranty?shop=${encodeURIComponent(shopFromUrl)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(
+        `/api/submit-warranty?shop=${encodeURIComponent(shopFromUrl)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }
+      );
       const data = await res.json();
       if (res.ok) {
         setStatus("Warranty submitted successfully.");
         setStatusType("success");
         setTimeout(() => {
-          window.location.href = `/thankyou?shop=${encodeURIComponent(shopFromUrl)}`;
+          window.location.href = `/thankyou?shop=${encodeURIComponent(
+            shopFromUrl
+          )}`;
         }, 1000);
       } else {
         setStatus(data.error || "Failed to submit warranty.");
@@ -749,446 +798,492 @@ export default function WarrantyPage() {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
         <img src={flagUrl} alt={label} width="20" />
-        <span><span className="ki0490400ki440ki">{label}</span>({value})</span>
+        <span>
+          <span className="ki0490400ki440ki">{label}</span>({value})
+        </span>
       </div>
     );
   };
 
   return (
     <main className="warranty-page">
-      <section className="warranty-section">
-        <form className="warranty-form" onSubmit={handleSubmit}>
-          <div className="email-verification-section fulllwwidth">
-            {!emailVerified && (
-              <>
-                {!otpSent ? (
-                  <>
-                    <div className="warranty-field">
-                      <label htmlFor="warranty-email">Email</label>
-                      <input
-                        id="warranty-email"
-                        className="warranty-input"
-                        type="email"
-                        name="customer_email"
-                        required
-                        value={email}
-                        placeholder="Email Address"
-                        onChange={(e) => setEmail(e.target.value)}
-                        disabled={checkingCustomer}
-                      />
-                    </div>
-                    <div className="warranty-actions otp-actions">
-                      <button
-                        className="warranty-button"
-                        onClick={handleSendOtp}
-                        disabled={!email.trim() || checkingCustomer}
-                      >
-                        {checkingCustomer ? "Checking..." : "Verify Email"}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="warranty-field">
-                      <label htmlFor="warranty-otp">Enter OTP</label>
-                      <input
-                        id="warranty-otp"
-                        className="warranty-input"
-                        type="text"
-                        name="otp"
-                        required
-                        value={otp}
-                        placeholder="Enter OTP"
-                        onChange={(e) => setOtp(e.target.value)}
-                      />
-                    </div>
-                    <div className="warranty-actions otp-actions">
-                      <button
-                        className="warranty-button secondary"
-                        onClick={handleVerifyOtp}
-                        disabled={!otp.trim()}
-                      >
-                        Verify OTP
-                      </button>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
+      {/* Billing loading state */}
+      {billingActive === null && (
+        <section className="warranty-section">
+          <p>Checking store subscription status...</p>
+        </section>
+      )}
 
-            {emailVerified && (
-              <div className="verification-success otp-actions">
-                <p>Email verified successfully!</p>
-                {showExistingCustomerMessage && existingCustomerData && (
-                  <p style={{ color: "#4CAF50", marginTop: "10px", fontSize: "14px" }}>
-                    ✓ Welcome back! Your details have been auto-filled.
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={handleEditEmail}
-                  className="edit-email-button"
-                  style={{
-                    marginLeft: "10px",
-                    padding: "4px 12px",
-                    fontSize: "12px",
-                    background: "#f0f0f0",
-                    border: "none",
-                    borderRadius: "4px",
-                    cursor: "pointer"
-                  }}
-                >
-                  Edit Email
-                </button>
-              </div>
-            )}
-          </div>
+      {/* Billing inactive - merchant not subscribed */}
+      {billingActive === false && (
+        <section className="warranty-section">
+          <h2>Warranty registration is not available</h2>
+          <p>
+            This store does not have an active subscription to the Warranty
+            Activation Suite. Please contact the store owner if you believe this is
+            a mistake.
+          </p>
+          {billingError && (
+            <p className="warranty-status warranty-status--error">
+              {billingError}
+            </p>
+          )}
+        </section>
+      )}
 
-          <div className="warranty-field fulllwwidth">
-            <label htmlFor="full_name">Full Name</label>
-            <input
-              id="full_name"
-              className="warranty-input"
-              type="text"
-              name="full_name"
-              placeholder="Full Name"
-              required
-              defaultValue={existingCustomerData?.displayName || ""}
-            />
-          </div>
-
-          {/* Phone Number Section */}
-          <div className="warranty-field fulllwwidth phone98008008">
-            <div className="phone-input-container">
-              <div className="country-code-selector">
-                <Select
-                  options={countryOptions}
-                  value={countryOptions.find((c) => c.value === phoneCountryCode)}
-                  onChange={(selected) => handleCountryCodeChange(selected.value)}
-                  formatOptionLabel={formatOptionLabel}
-                  isSearchable
-                />
-              </div>
-              
-              <input
-                id="phone"
-                className="warranty-input phone-number-input"
-                type="tel"
-                value={phoneNumber}
-                onChange={(e) => handlePhoneNumberChange(e.target.value)}
-                placeholder="+44 123 456 7890"
-                required
-                name="phone"
-              />
-            </div>
-            
-            {phoneError && (
-              <div className="phone-error-message">
-                {phoneError}
-              </div>
-            )}
-          </div>
-
-          {/* Address Search with Autocomplete */}
-          <div className="postal-address-search">
-            <div className="warranty-field">
-              <label htmlFor="search_address">Search UK Address</label>
-              <div className="address-autocomplete-container">
-                <input
-                  id="search_address"
-                  className="warranty-input"
-                  type="text"
-                  value={addressSearch}
-                  placeholder="Start typing address or postcode..."
-                  onChange={(e) => setAddressSearch(e.target.value)}
-                  name="search_address"
-                />
-
-                {showSuggestions && addressSuggestions.length > 0 && (
-                  <div className="address-suggestions-dropdown">
-                    {isSearching && (
-                      <div className="suggestion-loading">Searching...</div>
-                    )}
-
-                    {addressSuggestions.map((suggestion, index) => (
-                      <div
-                        key={index}
-                        className="suggestion-item"
-                        onClick={() => handleSelectAddress(suggestion)}
-                      >
-                        <div className="suggestion-main">
-                          {suggestion.display_name
-                            ? suggestion.display_name.split(",")[0]
-                            : "Address"}
-                        </div>
-                        <div className="suggestion-details">
-                          {suggestion.display_name
-                            ? suggestion.display_name.split(",").slice(1).join(",").trim()
-                            : ""}
-                        </div>
+      {/* Billing active - show the full warranty form */}
+      {billingActive === true && (
+        <section className="warranty-section">
+          <form className="warranty-form" onSubmit={handleSubmit}>
+            <div className="email-verification-section fulllwwidth">
+              {!emailVerified && (
+                <>
+                  {!otpSent ? (
+                    <>
+                      <div className="warranty-field">
+                        <label htmlFor="warranty-email">Email</label>
+                        <input
+                          id="warranty-email"
+                          className="warranty-input"
+                          type="email"
+                          name="customer_email"
+                          required
+                          value={email}
+                          placeholder="Email Address"
+                          onChange={(e) => setEmail(e.target.value)}
+                          disabled={checkingCustomer}
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                      <div className="warranty-actions otp-actions">
+                        <button
+                          className="warranty-button"
+                          onClick={handleSendOtp}
+                          disabled={!email.trim() || checkingCustomer}
+                        >
+                          {checkingCustomer ? "Checking..." : "Verify Email"}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="warranty-field">
+                        <label htmlFor="warranty-otp">Enter OTP</label>
+                        <input
+                          id="warranty-otp"
+                          className="warranty-input"
+                          type="text"
+                          name="otp"
+                          required
+                          value={otp}
+                          placeholder="Enter OTP"
+                          onChange={(e) => setOtp(e.target.value)}
+                        />
+                      </div>
+                      <div className="warranty-actions otp-actions">
+                        <button
+                          className="warranty-button secondary"
+                          onClick={handleVerifyOtp}
+                          disabled={!otp.trim()}
+                        >
+                          Verify OTP
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
 
-            <div className="warranty-actions otp-actions">
-              <button
-                className="warranty-button secondary"
-                type="button"
-                onClick={() => {
-                  if (addressSearch.trim()) {
-                    searchAddresses(addressSearch);
-                  }
-                }}
-                disabled={!addressSearch.trim()}
-              >
-                {isSearching ? "Searching..." : "Find Address"}
-              </button>
-            </div>
-          </div>
-
-          {/* Address Fields - Auto-filled from search */}
-          <div className="warranty-field">
-            <label htmlFor="street">Street Address</label>
-            <input
-              id="street"
-              className="warranty-input"
-              type="text"
-              name="street"
-              required
-              value={addressFields.street}
-              placeholder="Street Address"
-              onChange={(e) => handleAddressFieldChange("street", e.target.value)}
-            />
-          </div>
-
-          <div className="warranty-field">
-            <label htmlFor="town">Town / City</label>
-            <input
-              id="town"
-              className="warranty-input"
-              type="text"
-              name="town"
-              required
-              value={addressFields.town}
-              placeholder="Town / City"
-              onChange={(e) => handleAddressFieldChange("town", e.target.value)}
-            />
-          </div>
-
-          <div className="warranty-field">
-            <label htmlFor="country">Country</label>
-            <input
-              id="country"
-              className="warranty-input"
-              type="text"
-              name="country"
-              required
-              value={addressFields.country}
-              placeholder="Country"
-              onChange={(e) => handleAddressFieldChange("country", e.target.value)}
-            />
-          </div>
-
-          <div className="warranty-field">
-            <label htmlFor="postal_code">Postal Code</label>
-            <input
-              id="postal_code"
-              className="warranty-input"
-              type="text"
-              name="postal_code"
-              required
-              value={addressFields.postal_code}
-              placeholder="Postal Code"
-              onChange={(e) =>
-                handleAddressFieldChange("postal_code", e.target.value)
-              }
-            />
-          </div>
-
-          <div className="warranty-field labelupper908">
-            <label htmlFor="purchase_source_select">Purchase Source</label>
-
-            <div className="purchase-source-select-container">
-              <Select
-                inputId="purchase_source_select"
-                classNamePrefix="purchase-source-select"
-                options={purchaseSourceOptions}
-                value={selectedPurchaseSource}
-                onChange={(option) => setSelectedPurchaseSource(option)}
-                isLoading={purchaseSourcesLoading}
-                isClearable
-                isSearchable
-                placeholder={
-                  purchaseSourcesLoading
-                    ? "Loading purchase sources..."
-                    : purchaseSourcesError
-                    ? "Failed to load purchase sources"
-                    : "Select purchase source..."
-                }
-              />
-              <input
-                type="hidden"
-                name="purchase_source"
-                value={selectedPurchaseSource?.value || ""}
-                required
-              />
-            </div>
-
-            {purchaseSourcesError && (
-              <p className="warranty-status warranty-status--error">
-                {purchaseSourcesError}
-              </p>
-            )}
-          </div>
-
-          <div className="warranty-field labelupper908">
-            <label htmlFor="purchase_date">Purchase Date</label>
-            <input
-              id="purchase_date"
-              className="warranty-input"
-              type="date"
-              name="purchase_date"
-              required
-            />
-          </div>
-
-          <div className="warranty-field">
-            <label htmlFor="order_number">Order / Invoice Number</label>
-            <input
-              id="order_number"
-              className="warranty-input"
-              type="text"
-              name="order_number"
-              placeholder="Order / Invoice Number"
-              required
-            />
-          </div>
-
-          {/* Product typeahead field */}
-          <div className="warranty-field product-typeahead">
-            <label htmlFor="product_search">Product</label>
-
-            <input
-              id="product_search"
-              className="warranty-input"
-              type="text"
-              placeholder={
-                productsLoading
-                  ? "Loading products..."
-                  : productsError
-                  ? "Failed to load products"
-                  : "Type to search products..."
-              }
-              value={productSearchTerm}
-              onChange={(e) => {
-                setProductSearchTerm(e.target.value);
-                setShowProductDropdown(true);
-              }}
-              onFocus={() => {
-                if (!productsLoading && !productsError) {
-                  setShowProductDropdown(true);
-                }
-              }}
-              disabled={productsLoading || !!productsError}
-              autoComplete="off"
-            />
-
-            <input
-              type="hidden"
-              name="product_id"
-              value={selectedProductId}
-              required
-            />
-
-            {showProductDropdown && !productsLoading && !productsError && (
-              <div className="product-dropdown">
-                {filteredProducts.length === 0 ? (
-                  <div className="product-dropdown-item product-dropdown-empty">
-                    No products found
-                  </div>
-                ) : (
-                  filteredProducts.slice(0, 20).map((product) => (
-                    <div
-                      key={product.id}
-                      className={
-                        "product-dropdown-item" +
-                        (product.id === selectedProductId ? " selected" : "")
-                      }
-                      onClick={() => {
-                        setSelectedProductId(product.id);
-                        setProductSearchTerm(product.title);
-                        setShowProductDropdown(false);
+              {emailVerified && (
+                <div className="verification-success otp-actions">
+                  <p>Email verified successfully!</p>
+                  {showExistingCustomerMessage && existingCustomerData && (
+                    <p
+                      style={{
+                        color: "#4CAF50",
+                        marginTop: "10px",
+                        fontSize: "14px",
                       }}
                     >
-                      {product.title}
-                    </div>
-                  ))
-                )}
+                      ✓ Welcome back! Your details have been auto-filled.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleEditEmail}
+                    className="edit-email-button"
+                    style={{
+                      marginLeft: "10px",
+                      padding: "4px 12px",
+                      fontSize: "12px",
+                      background: "#f0f0f0",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Edit Email
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="warranty-field fulllwwidth">
+              <label htmlFor="full_name">Full Name</label>
+              <input
+                id="full_name"
+                className="warranty-input"
+                type="text"
+                name="full_name"
+                placeholder="Full Name"
+                required
+                defaultValue={existingCustomerData?.displayName || ""}
+              />
+            </div>
+
+            {/* Phone Number Section */}
+            <div className="warranty-field fulllwwidth phone98008008">
+              <div className="phone-input-container">
+                <div className="country-code-selector">
+                  <Select
+                    options={countryOptions}
+                    value={countryOptions.find(
+                      (c) => c.value === phoneCountryCode
+                    )}
+                    onChange={(selected) =>
+                      handleCountryCodeChange(selected.value)
+                    }
+                    formatOptionLabel={formatOptionLabel}
+                    isSearchable
+                  />
+                </div>
+
+                <input
+                  id="phone"
+                  className="warranty-input phone-number-input"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => handlePhoneNumberChange(e.target.value)}
+                  placeholder="+44 123 456 7890"
+                  required
+                  name="phone"
+                />
               </div>
-            )}
 
-            {productsError && (
-              <p className="warranty-status warranty-status--error">
-                {productsError}
-              </p>
-            )}
-          </div>
+              {phoneError && (
+                <div className="phone-error-message">{phoneError}</div>
+              )}
+            </div>
 
-          <div className="warranty-field">
-            <label htmlFor="serial_number">Product Serial Number</label>
-            <input
-              id="serial_number"
-              className="warranty-input"
-              type="text"
-              name="serial_number"
-              placeholder="Product Serial Number"
-              required
-            />
-          </div>
+            {/* Address Search with Autocomplete */}
+            <div className="postal-address-search">
+              <div className="warranty-field">
+                <label htmlFor="search_address">Search UK Address</label>
+                <div className="address-autocomplete-container">
+                  <input
+                    id="search_address"
+                    className="warranty-input"
+                    type="text"
+                    value={addressSearch}
+                    placeholder="Start typing address or postcode..."
+                    onChange={(e) => setAddressSearch(e.target.value)}
+                    name="search_address"
+                  />
 
-          <p className="flexpara fulllwwidth">
-            <input
-              type="checkbox"
-              name="termsformarketing"
-              id="termsformarketing"
-              defaultChecked
-            />
-            {" "}
-            {marketingTextLoading && !marketingText
-              ? "Loading..."
-              : marketingText ||
-                "Keep me updated with warranty status updates and follow-ups, which may include occasional offers and tech tips. You can unsubscribe anytime."}
-          </p>
+                  {showSuggestions && addressSuggestions.length > 0 && (
+                    <div className="address-suggestions-dropdown">
+                      {isSearching && (
+                        <div className="suggestion-loading">Searching...</div>
+                      )}
 
-          <div className="warranty-actions">
-            <button
-              className="warranty-button"
-              type="submit"
-              disabled={!emailVerified}
+                      {addressSuggestions.map((suggestion, index) => (
+                        <div
+                          key={index}
+                          className="suggestion-item"
+                          onClick={() => handleSelectAddress(suggestion)}
+                        >
+                          <div className="suggestion-main">
+                            {suggestion.display_name
+                              ? suggestion.display_name.split(",")[0]
+                              : "Address"}
+                          </div>
+                          <div className="suggestion-details">
+                            {suggestion.display_name
+                              ? suggestion.display_name
+                                  .split(",")
+                                  .slice(1)
+                                  .join(",")
+                                  .trim()
+                              : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="warranty-actions otp-actions">
+                <button
+                  className="warranty-button secondary"
+                  type="button"
+                  onClick={() => {
+                    if (addressSearch.trim()) {
+                      searchAddresses(addressSearch);
+                    }
+                  }}
+                  disabled={!addressSearch.trim()}
+                >
+                  {isSearching ? "Searching..." : "Find Address"}
+                </button>
+              </div>
+            </div>
+
+            {/* Address Fields - Auto-filled from search */}
+            <div className="warranty-field">
+              <label htmlFor="street">Street Address</label>
+              <input
+                id="street"
+                className="warranty-input"
+                type="text"
+                name="street"
+                required
+                value={addressFields.street}
+                placeholder="Street Address"
+                onChange={(e) =>
+                  handleAddressFieldChange("street", e.target.value)
+                }
+              />
+            </div>
+
+            <div className="warranty-field">
+              <label htmlFor="town">Town / City</label>
+              <input
+                id="town"
+                className="warranty-input"
+                type="text"
+                name="town"
+                required
+                value={addressFields.town}
+                placeholder="Town / City"
+                onChange={(e) =>
+                  handleAddressFieldChange("town", e.target.value)
+                }
+              />
+            </div>
+
+            <div className="warranty-field">
+              <label htmlFor="country">Country</label>
+              <input
+                id="country"
+                className="warranty-input"
+                type="text"
+                name="country"
+                required
+                value={addressFields.country}
+                placeholder="Country"
+                onChange={(e) =>
+                  handleAddressFieldChange("country", e.target.value)
+                }
+              />
+            </div>
+
+            <div className="warranty-field">
+              <label htmlFor="postal_code">Postal Code</label>
+              <input
+                id="postal_code"
+                className="warranty-input"
+                type="text"
+                name="postal_code"
+                required
+                value={addressFields.postal_code}
+                placeholder="Postal Code"
+                onChange={(e) =>
+                  handleAddressFieldChange("postal_code", e.target.value)
+                }
+              />
+            </div>
+
+            <div className="warranty-field labelupper908">
+              <label htmlFor="purchase_source_select">Purchase Source</label>
+
+              <div className="purchase-source-select-container">
+                <Select
+                  inputId="purchase_source_select"
+                  classNamePrefix="purchase-source-select"
+                  options={purchaseSourceOptions}
+                  value={selectedPurchaseSource}
+                  onChange={(option) => setSelectedPurchaseSource(option)}
+                  isLoading={purchaseSourcesLoading}
+                  isClearable
+                  isSearchable
+                  placeholder={
+                    purchaseSourcesLoading
+                      ? "Loading purchase sources..."
+                      : purchaseSourcesError
+                      ? "Failed to load purchase sources"
+                      : "Select purchase source..."
+                  }
+                />
+                <input
+                  type="hidden"
+                  name="purchase_source"
+                  value={selectedPurchaseSource?.value || ""}
+                  required
+                />
+              </div>
+
+              {purchaseSourcesError && (
+                <p className="warranty-status warranty-status--error">
+                  {purchaseSourcesError}
+                </p>
+              )}
+            </div>
+
+            <div className="warranty-field labelupper908">
+              <label htmlFor="purchase_date">Purchase Date</label>
+              <input
+                id="purchase_date"
+                className="warranty-input"
+                type="date"
+                name="purchase_date"
+                required
+              />
+            </div>
+
+            <div className="warranty-field">
+              <label htmlFor="order_number">Order / Invoice Number</label>
+              <input
+                id="order_number"
+                className="warranty-input"
+                type="text"
+                name="order_number"
+                placeholder="Order / Invoice Number"
+                required
+              />
+            </div>
+
+            {/* Product typeahead field */}
+            <div className="warranty-field product-typeahead">
+              <label htmlFor="product_search">Product</label>
+
+              <input
+                id="product_search"
+                className="warranty-input"
+                type="text"
+                placeholder={
+                  productsLoading
+                    ? "Loading products..."
+                    : productsError
+                    ? "Failed to load products"
+                    : "Type to search products..."
+                }
+                value={productSearchTerm}
+                onChange={(e) => {
+                  setProductSearchTerm(e.target.value);
+                  setShowProductDropdown(true);
+                }}
+                onFocus={() => {
+                  if (!productsLoading && !productsError) {
+                    setShowProductDropdown(true);
+                  }
+                }}
+                disabled={productsLoading || !!productsError}
+                autoComplete="off"
+              />
+
+              <input
+                type="hidden"
+                name="product_id"
+                value={selectedProductId}
+                required
+              />
+
+              {showProductDropdown && !productsLoading && !productsError && (
+                <div className="product-dropdown">
+                  {filteredProducts.length === 0 ? (
+                    <div className="product-dropdown-item product-dropdown-empty">
+                      No products found
+                    </div>
+                  ) : (
+                    filteredProducts.slice(0, 20).map((product) => (
+                      <div
+                        key={product.id}
+                        className={
+                          "product-dropdown-item" +
+                          (product.id === selectedProductId ? " selected" : "")
+                        }
+                        onClick={() => {
+                          setSelectedProductId(product.id);
+                          setProductSearchTerm(product.title);
+                          setShowProductDropdown(false);
+                        }}
+                      >
+                        {product.title}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {productsError && (
+                <p className="warranty-status warranty-status--error">
+                  {productsError}
+                </p>
+              )}
+            </div>
+
+            <div className="warranty-field">
+              <label htmlFor="serial_number">Product Serial Number</label>
+              <input
+                id="serial_number"
+                className="warranty-input"
+                type="text"
+                name="serial_number"
+                placeholder="Product Serial Number"
+                required
+              />
+            </div>
+
+            <p className="flexpara fulllwwidth">
+              <input
+                type="checkbox"
+                name="termsformarketing"
+                id="termsformarketing"
+                defaultChecked
+              />{" "}
+              {marketingTextLoading && !marketingText
+                ? "Loading..."
+                : marketingText ||
+                  "Keep me updated with warranty status updates and follow-ups, which may include occasional offers and tech tips. You can unsubscribe anytime."}
+            </p>
+
+            <div className="warranty-actions">
+              <button
+                className="warranty-button"
+                type="submit"
+                disabled={!emailVerified}
+              >
+                Submit Warranty
+              </button>
+            </div>
+          </form>
+
+          {status && (
+            <p
+              className={
+                "warranty-status " +
+                (statusType === "error"
+                  ? "warranty-status--error"
+                  : statusType === "success"
+                  ? "warranty-status--success"
+                  : "")
+              }
             >
-              Submit Warranty
-            </button>
-          </div>
-        </form>
-
-        {status && (
-          <p
-            className={
-              "warranty-status " +
-              (statusType === "error"
-                ? "warranty-status--error"
-                : statusType === "success"
-                ? "warranty-status--success"
-                : "")
-            }
-          >
-            {status}
-          </p>
-        )}
-      </section>
+              {status}
+            </p>
+          )}
+        </section>
+      )}
     </main>
   );
 }

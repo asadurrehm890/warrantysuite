@@ -31,6 +31,11 @@ export default function WarrantyClaimPage() {
     "Keep me updated on my claim status via email"
   );
 
+  // NEW: Billing status state
+  // null = loading, true = active subscription, false = not active
+  const [billingActive, setBillingActive] = useState(null);
+  const [billingError, setBillingError] = useState(null);
+
   // Cloudinary Free Plan Limits
   const CLOUDINARY_LIMITS = {
     MAX_FILE_SIZE: 1 * 1024 * 1024, // 10MB
@@ -45,7 +50,7 @@ export default function WarrantyClaimPage() {
     ],
     ALLOWED_RAW_TYPES: ["application/pdf"],
     MAX_DIMENSIONS: {
-      width: 2500, // Reasonable limit for 25MP (approx 5000x5000)
+      width: 2500, // Reasonable limit
       height: 2500,
     },
   };
@@ -108,6 +113,34 @@ export default function WarrantyClaimPage() {
     }
   }, []);
 
+  // NEW: check billing status for this shop
+  useEffect(() => {
+    const checkBilling = async () => {
+      if (!shopDomain) return;
+
+      try {
+        setBillingError(null);
+        setBillingActive(null); // reset to loading
+
+        const res = await fetch(
+          `/api/billing-status?shop=${encodeURIComponent(shopDomain)}`
+        );
+        const data = await res.json();
+        setBillingActive(!!data.active);
+
+        if (!data.active && data.error) {
+          setBillingError(data.error);
+        }
+      } catch (err) {
+        console.error("Error checking billing status:", err);
+        setBillingActive(false);
+        setBillingError("Unable to verify store subscription.");
+      }
+    };
+
+    checkBilling();
+  }, [shopDomain]);
+
   // NEW: fetch warranty settings (including claim marketing text)
   useEffect(() => {
     const fetchWarrantySettings = async () => {
@@ -126,8 +159,6 @@ export default function WarrantyClaimPage() {
         if (data.claimMarketingText) {
           setClaimMarketingText(data.claimMarketingText);
         }
-        // If you ever want registration marketing text here as well:
-        // if (data.marketingText) { ... }
       } catch (err) {
         console.error("Error fetching warranty settings:", err);
       }
@@ -194,7 +225,7 @@ export default function WarrantyClaimPage() {
     setClaimType(selectedOption);
   };
 
-  // Check image dimensions (optional - if you want to be extra safe)
+  // Check image dimensions (optional)
   const checkImageDimensions = (file) => {
     return new Promise((resolve) => {
       if (!file.type.startsWith("image/")) {
@@ -267,7 +298,7 @@ export default function WarrantyClaimPage() {
         continue;
       }
 
-      // For images, check approximate dimensions (optional but recommended)
+      // For images, check dimensions
       if (isImage) {
         const validDimensions = await checkImageDimensions(file);
         if (!validDimensions) {
@@ -554,394 +585,420 @@ export default function WarrantyClaimPage() {
 
   return (
     <main className="warranty-claim-page">
-      <section className="warranty-claim-section">
-        <form className="warranty-claim-form" onSubmit={handleSubmit}>
-          {/* Email Verification Section */}
-          <div className="email-verification-section">
-            {!emailVerified && (
+      {/* Billing loading state */}
+      {billingActive === null && (
+        <section className="warranty-claim-section">
+          <p>Checking store subscription status...</p>
+        </section>
+      )}
+
+      {/* Billing inactive - merchant not subscribed */}
+      {billingActive === false && (
+        <section className="warranty-claim-section">
+          <h2>Warranty claim form is not available</h2>
+          <p>
+            This store does not have an active subscription to the Warranty
+            Activation Suite. Please contact the store owner if you believe this is
+            an error.
+          </p>
+          {billingError && (
+            <div className="warranty-claim-status warranty-claim-status--error">
+              {billingError}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Billing active - show full claim form */}
+      {billingActive === true && (
+        <section className="warranty-claim-section">
+          <form className="warranty-claim-form" onSubmit={handleSubmit}>
+            {/* Email Verification Section */}
+            <div className="email-verification-section">
+              {!emailVerified && (
+                <>
+                  {!otpSent ? (
+                    <>
+                      <div className="warranty-claim-field">
+                        <label htmlFor="claim-email">Email Address</label>
+                        <input
+                          id="claim-email"
+                          className="warranty-claim-input"
+                          type="email"
+                          required
+                          value={email}
+                          placeholder="Enter your email"
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="warranty-claim-actions">
+                        <button
+                          className="warranty-claim-button"
+                          onClick={handleSendOtp}
+                          disabled={!email.trim()}
+                          type="button"
+                        >
+                          Send Verification Code
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="warranty-claim-field">
+                        <label htmlFor="claim-otp">
+                          Enter Verification Code
+                        </label>
+                        <input
+                          id="claim-otp"
+                          className="warranty-claim-input"
+                          type="text"
+                          required
+                          value={otp}
+                          placeholder="Enter OTP"
+                          onChange={(e) => setOtp(e.target.value)}
+                        />
+                      </div>
+                      <div className="warranty-claim-actions">
+                        <button
+                          className="warranty-claim-button secondary"
+                          onClick={handleVerifyOtp}
+                          disabled={!otp.trim()}
+                          type="button"
+                        >
+                          Verify Code
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              {emailVerified && (
+                <div className="verification-success">
+                  <p>✓ Email verified successfully!</p>
+                  <button
+                    className="warranty-claim-button small secondary"
+                    onClick={handleEditEmail}
+                    type="button"
+                  >
+                    Change Email
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Warranty Selection Section - Only show after email verification */}
+            {emailVerified && (
               <>
-                {!otpSent ? (
-                  <>
-                    <div className="warranty-claim-field">
-                      <label htmlFor="claim-email">Email Address</label>
-                      <input
-                        id="claim-email"
-                        className="warranty-claim-input"
-                        type="email"
-                        required
-                        value={email}
-                        placeholder="Enter your email"
-                        onChange={(e) => setEmail(e.target.value)}
+                <div className="warranty-claim-field">
+                  <label htmlFor="warranty_select">
+                    Select Product for Claim
+                  </label>
+
+                  {warrantiesLoading && (
+                    <p className="loading-message">
+                      Loading your warranties...
+                    </p>
+                  )}
+
+                  {warrantiesError && (
+                    <p className="error-message">{warrantiesError}</p>
+                  )}
+
+                  {!warrantiesLoading &&
+                    !warrantiesError &&
+                    warranties.length === 0 && (
+                      <div className="no-warranties-message">
+                        <p>No warranties found for this email address.</p>
+                        <p>
+                          Please make sure you've registered your product
+                          first.
+                        </p>
+                      </div>
+                    )}
+
+                  {!warrantiesLoading &&
+                    !warrantiesError &&
+                    warranties.length > 0 && (
+                      <Select
+                        id="warranty_select"
+                        options={getWarrantyOptions()}
+                        value={selectedWarranty}
+                        onChange={handleWarrantySelect}
+                        placeholder="Select a product..."
+                        isClearable
+                        isSearchable
+                        styles={selectStyles}
+                        className="react-select-container"
+                        classNamePrefix="react-select"
+                        noOptionsMessage={() => "No products found"}
+                        loadingMessage={() => "Loading products..."}
+                        isLoading={warrantiesLoading}
                       />
-                    </div>
-                    <div className="warranty-claim-actions">
-                      <button
-                        className="warranty-claim-button"
-                        onClick={handleSendOtp}
-                        disabled={!email.trim()}
-                        type="button"
-                      >
-                        Send Verification Code
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="warranty-claim-field">
-                      <label htmlFor="claim-otp">
-                        Enter Verification Code
-                      </label>
-                      <input
-                        id="claim-otp"
-                        className="warranty-claim-input"
-                        type="text"
-                        required
-                        value={otp}
-                        placeholder="Enter OTP"
-                        onChange={(e) => setOtp(e.target.value)}
-                      />
-                    </div>
-                    <div className="warranty-claim-actions">
-                      <button
-                        className="warranty-claim-button secondary"
-                        onClick={handleVerifyOtp}
-                        disabled={!otp.trim()}
-                        type="button"
-                      >
-                        Verify Code
-                      </button>
-                    </div>
-                  </>
+                    )}
+                </div>
+
+                {/* Selected Warranty Details */}
+                {selectedWarrantyDetails && (
+                  <div className="selected-warranty-details">
+                    <h3>Selected Product Details</h3>
+                    <p>
+                      <strong>Product:</strong>{" "}
+                      {selectedWarrantyDetails.product_name}
+                    </p>
+                    <p>
+                      <strong>Order Number:</strong>{" "}
+                      {selectedWarrantyDetails.order_number}
+                    </p>
+                    <p>
+                      <strong>Purchase Date:</strong>{" "}
+                      {new Date(
+                        selectedWarrantyDetails.purchase_date
+                      ).toLocaleDateString()}
+                    </p>
+                    <p>
+                      <strong>Serial Number:</strong>{" "}
+                      {selectedWarrantyDetails.serial_number}
+                    </p>
+                  </div>
                 )}
+
+                {/* Claim Type Selection */}
+                <div className="warranty-claim-field">
+                  <label htmlFor="claim_type">Type of Issue</label>
+                  <Select
+                    id="claim_type"
+                    options={claimTypeOptions}
+                    value={claimType}
+                    onChange={handleClaimTypeSelect}
+                    placeholder="Select issue type..."
+                    isClearable
+                    isSearchable
+                    styles={selectStyles}
+                    className="react-select-container"
+                    classNamePrefix="react-select"
+                    noOptionsMessage={() => "No options available"}
+                  />
+                </div>
+
+                {/* Claim Description */}
+                <div className="warranty-claim-field">
+                  <label htmlFor="claim_description">
+                    Describe the Issue
+                  </label>
+                  <textarea
+                    id="claim_description"
+                    className="warranty-claim-textarea"
+                    value={claimDescription}
+                    onChange={(e) =>
+                      setClaimDescription(e.target.value)
+                    }
+                    placeholder="Please describe what's wrong with your product in detail..."
+                    rows="6"
+                    required
+                  />
+                </div>
+
+                {/* Enhanced File Upload Section with Cloudinary Free Plan Limits */}
+                <div className="warranty-claim-field">
+                  <label htmlFor="claim_files">
+                    Supporting Photos/Documents
+                    <span className="optional-label"> (Optional)</span>
+                  </label>
+
+                  <div className="file-upload-container">
+                    <input
+                      id="claim_files"
+                      className="warranty-claim-file-input"
+                      type="file"
+                      multiple
+                      accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+                      onChange={handleFileChange}
+                      disabled={fileUploading}
+                    />
+
+                    <div className="file-upload-info">
+                      <div className="file-limits">
+                        <span className="limit-badge">
+                          📦 Max {CLOUDINARY_LIMITS.MAX_FILES} files
+                        </span>
+                        <span className="limit-badge">
+                          ⚡ Max 10MB per file
+                        </span>
+                        <span className="limit-badge">
+                          🖼️ JPG, PNG, GIF, WEBP, PDF
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* File counter and size summary */}
+                  {files.length > 0 && (
+                    <div className="file-summary">
+                      <span className="file-count">
+                        {files.length} of {CLOUDINARY_LIMITS.MAX_FILES} files
+                        selected
+                      </span>
+                      <span className="file-total-size">
+                        Total: {formatFileSize(getTotalFileSize())}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Selected Files with Progress */}
+                  {files.length > 0 && (
+                    <div className="selected-files">
+                      <p>
+                        <strong>Selected files:</strong>
+                      </p>
+                      <ul className="file-list">
+                        {files.map((file, index) => (
+                          <li key={index} className="file-item">
+                            <div className="file-info">
+                              <span className="file-name">
+                                {file.name}
+                              </span>
+                              <span className="file-size">
+                                ({formatFileSize(file.size)})
+                              </span>
+                              {file.type.startsWith("image/") && (
+                                <span className="file-type-badge">
+                                  📷 Image
+                                </span>
+                              )}
+                              {file.type === "application/pdf" && (
+                                <span className="file-type-badge">
+                                  📄 PDF
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="file-status">
+                              {uploadProgress[file.name] === 100 && (
+                                <span className="upload-success">
+                                  ✓ Uploaded to Cloudinary
+                                </span>
+                              )}
+                              {uploadProgress[file.name] === -1 && (
+                                <span className="upload-error">
+                                  ✗ Upload failed
+                                </span>
+                              )}
+                              {fileUploading &&
+                                uploadProgress[file.name] > 0 &&
+                                uploadProgress[file.name] < 100 && (
+                                  <div className="progress-container">
+                                    <div
+                                      className="progress-bar"
+                                      style={{
+                                        width: `${uploadProgress[file.name]}%`,
+                                      }}
+                                    />
+                                    <span className="progress-text">
+                                      {uploadProgress[file.name]}%
+                                    </span>
+                                  </div>
+                                )}
+                              {!fileUploading &&
+                                uploadProgress[file.name] === 0 && (
+                                  <button
+                                    type="button"
+                                    className="remove-file-button"
+                                    onClick={() =>
+                                      handleRemoveFile(file.name)
+                                    }
+                                  >
+                                    ✕ Remove
+                                  </button>
+                                )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Uploaded Files Summary */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="uploaded-files-summary">
+                      <p>
+                        <strong>✓ Uploaded to Cloudinary:</strong>
+                      </p>
+                      <ul>
+                        {uploadedFiles.map((file, index) => (
+                          <li key={index}>
+                            <a
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="uploaded-file-link"
+                            >
+                              {file.name} ({formatFileSize(file.size)})
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Submit Button */}
+                <div className="warranty-claim-actions">
+                  <button
+                    className="warranty-claim-button"
+                    type="submit"
+                    disabled={
+                      !emailVerified ||
+                      !selectedWarranty ||
+                      !claimDescription ||
+                      !claimType ||
+                      fileUploading
+                    }
+                  >
+                    {fileUploading ? (
+                      <span className="button-with-spinner">
+                        <span className="spinner"></span>
+                        Uploading to Cloudinary...
+                      </span>
+                    ) : (
+                      "Submit Warranty Claim"
+                    )}
+                  </button>
+                </div>
+
+                {/* Marketing Consent (now dynamic) */}
+                <p className="flexpara">
+                  <input
+                    type="checkbox"
+                    name="termsformarketing"
+                    id="termsformarketing"
+                    defaultChecked
+                  />
+                  <label htmlFor="termsformarketing">
+                    {claimMarketingText}
+                  </label>
+                </p>
               </>
             )}
 
-            {emailVerified && (
-              <div className="verification-success">
-                <p>✓ Email verified successfully!</p>
-                <button
-                  className="warranty-claim-button small secondary"
-                  onClick={handleEditEmail}
-                  type="button"
-                >
-                  Change Email
-                </button>
+            {/* Status Messages */}
+            {status && (
+              <div
+                className={
+                  "warranty-claim-status " +
+                  (statusType === "error"
+                    ? "warranty-claim-status--error"
+                    : statusType === "success"
+                    ? "warranty-claim-status--success"
+                    : "warranty-claim-status--info")
+                }
+              >
+                {status}
               </div>
             )}
-          </div>
-
-          {/* Warranty Selection Section - Only show after email verification */}
-          {emailVerified && (
-            <>
-              <div className="warranty-claim-field">
-                <label htmlFor="warranty_select">
-                  Select Product for Claim
-                </label>
-
-                {warrantiesLoading && (
-                  <p className="loading-message">
-                    Loading your warranties...
-                  </p>
-                )}
-
-                {warrantiesError && (
-                  <p className="error-message">{warrantiesError}</p>
-                )}
-
-                {!warrantiesLoading &&
-                  !warrantiesError &&
-                  warranties.length === 0 && (
-                    <div className="no-warranties-message">
-                      <p>No warranties found for this email address.</p>
-                      <p>
-                        Please make sure you've registered your product
-                        first.
-                      </p>
-                    </div>
-                  )}
-
-                {!warrantiesLoading &&
-                  !warrantiesError &&
-                  warranties.length > 0 && (
-                    <Select
-                      id="warranty_select"
-                      options={getWarrantyOptions()}
-                      value={selectedWarranty}
-                      onChange={handleWarrantySelect}
-                      placeholder="Select a product..."
-                      isClearable
-                      isSearchable
-                      styles={selectStyles}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      noOptionsMessage={() => "No products found"}
-                      loadingMessage={() => "Loading products..."}
-                      isLoading={warrantiesLoading}
-                    />
-                  )}
-              </div>
-
-              {/* Selected Warranty Details */}
-              {selectedWarrantyDetails && (
-                <div className="selected-warranty-details">
-                  <h3>Selected Product Details</h3>
-                  <p>
-                    <strong>Product:</strong>{" "}
-                    {selectedWarrantyDetails.product_name}
-                  </p>
-                  <p>
-                    <strong>Order Number:</strong>{" "}
-                    {selectedWarrantyDetails.order_number}
-                  </p>
-                  <p>
-                    <strong>Purchase Date:</strong>{" "}
-                    {new Date(
-                      selectedWarrantyDetails.purchase_date
-                    ).toLocaleDateString()}
-                  </p>
-                  <p>
-                    <strong>Serial Number:</strong>{" "}
-                    {selectedWarrantyDetails.serial_number}
-                  </p>
-                </div>
-              )}
-
-              {/* Claim Type Selection */}
-              <div className="warranty-claim-field">
-                <label htmlFor="claim_type">Type of Issue</label>
-                <Select
-                  id="claim_type"
-                  options={claimTypeOptions}
-                  value={claimType}
-                  onChange={handleClaimTypeSelect}
-                  placeholder="Select issue type..."
-                  isClearable
-                  isSearchable
-                  styles={selectStyles}
-                  className="react-select-container"
-                  classNamePrefix="react-select"
-                  noOptionsMessage={() => "No options available"}
-                />
-              </div>
-
-              {/* Claim Description */}
-              <div className="warranty-claim-field">
-                <label htmlFor="claim_description">
-                  Describe the Issue
-                </label>
-                <textarea
-                  id="claim_description"
-                  className="warranty-claim-textarea"
-                  value={claimDescription}
-                  onChange={(e) =>
-                    setClaimDescription(e.target.value)
-                  }
-                  placeholder="Please describe what's wrong with your product in detail..."
-                  rows="6"
-                  required
-                />
-              </div>
-
-              {/* Enhanced File Upload Section with Cloudinary Free Plan Limits */}
-              <div className="warranty-claim-field">
-                <label htmlFor="claim_files">
-                  Supporting Photos/Documents
-                  <span className="optional-label"> (Optional)</span>
-                </label>
-
-                <div className="file-upload-container">
-                  <input
-                    id="claim_files"
-                    className="warranty-claim-file-input"
-                    type="file"
-                    multiple
-                    accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
-                    onChange={handleFileChange}
-                    disabled={fileUploading}
-                  />
-
-                  <div className="file-upload-info">
-                    <div className="file-limits">
-                      <span className="limit-badge">
-                        📦 Max {CLOUDINARY_LIMITS.MAX_FILES} files
-                      </span>
-                      <span className="limit-badge">
-                        ⚡ Max 10MB per file
-                      </span>
-                      <span className="limit-badge">
-                        🖼️ JPG, PNG, GIF, WEBP, PDF
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* File counter and size summary */}
-                {files.length > 0 && (
-                  <div className="file-summary">
-                    <span className="file-count">
-                      {files.length} of {CLOUDINARY_LIMITS.MAX_FILES} files
-                      selected
-                    </span>
-                    <span className="file-total-size">
-                      Total: {formatFileSize(getTotalFileSize())}
-                    </span>
-                  </div>
-                )}
-
-                {/* Selected Files with Progress */}
-                {files.length > 0 && (
-                  <div className="selected-files">
-                    <p>
-                      <strong>Selected files:</strong>
-                    </p>
-                    <ul className="file-list">
-                      {files.map((file, index) => (
-                        <li key={index} className="file-item">
-                          <div className="file-info">
-                            <span className="file-name">
-                              {file.name}
-                            </span>
-                            <span className="file-size">
-                              ({formatFileSize(file.size)})
-                            </span>
-                            {file.type.startsWith("image/") && (
-                              <span className="file-type-badge">
-                                📷 Image
-                              </span>
-                            )}
-                            {file.type === "application/pdf" && (
-                              <span className="file-type-badge">
-                                📄 PDF
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="file-status">
-                            {uploadProgress[file.name] === 100 && (
-                              <span className="upload-success">
-                                ✓ Uploaded to Cloudinary
-                              </span>
-                            )}
-                            {uploadProgress[file.name] === -1 && (
-                              <span className="upload-error">
-                                ✗ Upload failed
-                              </span>
-                            )}
-                            {fileUploading &&
-                              uploadProgress[file.name] > 0 &&
-                              uploadProgress[file.name] < 100 && (
-                                <div className="progress-container">
-                                  <div
-                                    className="progress-bar"
-                                    style={{
-                                      width: `${uploadProgress[file.name]}%`,
-                                    }}
-                                  />
-                                  <span className="progress-text">
-                                    {uploadProgress[file.name]}%
-                                  </span>
-                                </div>
-                              )}
-                            {!fileUploading &&
-                              uploadProgress[file.name] === 0 && (
-                                <button
-                                  type="button"
-                                  className="remove-file-button"
-                                  onClick={() =>
-                                    handleRemoveFile(file.name)
-                                  }
-                                >
-                                  ✕ Remove
-                                </button>
-                              )}
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Uploaded Files Summary */}
-                {uploadedFiles.length > 0 && (
-                  <div className="uploaded-files-summary">
-                    <p>
-                      <strong>✓ Uploaded to Cloudinary:</strong>
-                    </p>
-                    <ul>
-                      {uploadedFiles.map((file, index) => (
-                        <li key={index}>
-                          <a
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="uploaded-file-link"
-                          >
-                            {file.name} (
-                            {formatFileSize(file.size)})
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Submit Button */}
-              <div className="warranty-claim-actions">
-                <button
-                  className="warranty-claim-button"
-                  type="submit"
-                  disabled={
-                    !emailVerified ||
-                    !selectedWarranty ||
-                    !claimDescription ||
-                    !claimType ||
-                    fileUploading
-                  }
-                >
-                  {fileUploading ? (
-                    <span className="button-with-spinner">
-                      <span className="spinner"></span>
-                      Uploading to Cloudinary...
-                    </span>
-                  ) : (
-                    "Submit Warranty Claim"
-                  )}
-                </button>
-              </div>
-
-              {/* Marketing Consent (now dynamic) */}
-              <p className="flexpara">
-                <input
-                  type="checkbox"
-                  name="termsformarketing"
-                  id="termsformarketing"
-                  defaultChecked
-                />
-                <label htmlFor="termsformarketing">
-                  {claimMarketingText}
-                </label>
-              </p>
-            </>
-          )}
-
-          {/* Status Messages */}
-          {status && (
-            <div
-              className={
-                "warranty-claim-status " +
-                (statusType === "error"
-                  ? "warranty-claim-status--error"
-                  : statusType === "success"
-                  ? "warranty-claim-status--success"
-                  : "warranty-claim-status--info")
-              }
-            >
-              {status}
-            </div>
-          )}
-        </form>
-      </section>
+          </form>
+        </section>
+      )}
     </main>
   );
 }

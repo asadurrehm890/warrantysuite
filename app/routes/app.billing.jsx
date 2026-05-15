@@ -24,10 +24,11 @@ export const action = async ({ request }) => {
 
   const response = await admin.graphql(
     `#graphql
-    mutation CreateAnnualSubscription($name: String!, $returnUrl: URL!) {
+    mutation CreateAnnualSubscription($name: String!, $returnUrl: URL!, $test: Boolean) {
       appSubscriptionCreate(
         name: $name
         returnUrl: $returnUrl
+        test: $test
         lineItems: [
           {
             plan: {
@@ -54,6 +55,7 @@ export const action = async ({ request }) => {
       variables: {
         name: "Warranty Activation Suite - Annual Plan",
         returnUrl,
+        test: process.env.NODE_ENV !== "production",
       },
     },
   );

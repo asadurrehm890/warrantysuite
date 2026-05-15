@@ -1,39 +1,10 @@
-import { getAdminClientForShop } from "./admin-client.server";
-
-/**
- * Check if the shop has an active subscription to your plan.
- */
-export async function getBillingStatus(shop) {
-  const admin = await getAdminClientForShop(shop);
-
-  const response = await admin.query({
-    data: {
-      query: `
-        query CurrentAppSubscription {
-          currentAppInstallation {
-            activeSubscriptions {
-              id
-              name
-              status
-            }
-          }
-        }
-      `,
-    },
-  });
-
-  const activeSubs =
-    response.body.data.currentAppInstallation?.activeSubscriptions ?? [];
-
-  if (!activeSubs.length) {
-    return { active: false };
-  }
-
-  // Optional: restrict to your specific plan name
-  const planName = "Warranty Activation Suite - Annual Plan";
-  const hasPlan = activeSubs.some(
-    (sub) => sub.status === "ACTIVE" && sub.name === planName,
+// Deprecated. Billing checks now use the App Proxy auth context inside
+// app/routes/api.billing-status.jsx (calls admin.graphql directly with
+// the offline session resolved from the signed proxy request).
+//
+// Kept as a stub so an accidental import is caught at runtime.
+export function getBillingStatus() {
+  throw new Error(
+    "getBillingStatus() is deprecated. Use authenticate.public.appProxy in your route instead."
   );
-
-  return { active: hasPlan };
 }

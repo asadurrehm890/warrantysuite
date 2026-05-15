@@ -153,7 +153,7 @@ export default function AppDocumentationPage() {
               <s-text type="strong">New purchase source</s-text> field — for
               example <s-text type="emphasis">Amazon</s-text>,{" "}
               <s-text type="emphasis">eBay</s-text>,{" "}
-              <s-text type="emphasis">Mobitel Website</s-text>, or{" "}
+              <s-text type="emphasis">Your Website</s-text>, or{" "}
               <s-text type="emphasis">Physical Store</s-text>.
             </s-text>
             <s-text>

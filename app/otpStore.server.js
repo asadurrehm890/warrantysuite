@@ -1,10 +1,16 @@
 // app/otpStore.server.js
 import crypto from "crypto";
-import prisma from "./db.server"; // same import used in app.warranty-settings.jsx
+import prisma from "./db.server";
+import { decryptSecret } from "./utils/crypto.server";
 
-const otpMap = new Map();
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-// Load Brevo configuration for a specific shop from Prisma
+// Hash OTP before storing so the database never holds plaintext codes.
+function hashCode(code) {
+  return crypto.createHash("sha256").update(String(code)).digest("hex");
+}
+
+// Load Brevo configuration for a specific shop from Prisma (decrypted).
 async function getBrevoConfigForShop(shop) {
   if (!shop) {
     throw new Error("Shop is required to load Brevo configuration");
@@ -18,26 +24,21 @@ async function getBrevoConfigForShop(shop) {
     throw new Error(`No warranty settings found for shop ${shop}`);
   }
 
-  const { brevoApiKey, brevoSenderEmail } = settings;
+  const brevoApiKey = decryptSecret(settings.brevoApiKey);
+  const brevoSenderEmail = settings.brevoSenderEmail;
 
   if (!brevoApiKey) {
     throw new Error(`Brevo API key is not configured for shop ${shop}`);
   }
-
   if (!brevoSenderEmail) {
     throw new Error(`Brevo sender email is not configured for shop ${shop}`);
   }
 
-  return {
-    apiKey: brevoApiKey,
-    senderEmail: brevoSenderEmail,
-  };
+  return { apiKey: brevoApiKey, senderEmail: brevoSenderEmail };
 }
 
-// Function to send email via Brevo API using per-shop config
 async function sendBrevoEmail(shop, email, code) {
   const { apiKey, senderEmail } = await getBrevoConfigForShop(shop);
-  const senderName = "Warranty Activation";
 
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
@@ -47,16 +48,8 @@ async function sendBrevoEmail(shop, email, code) {
       accept: "application/json",
     },
     body: JSON.stringify({
-      sender: {
-        name: senderName,
-        email: senderEmail,
-      },
-      to: [
-        {
-          email,
-          name: email.split("@")[0], // Optional: name from email
-        },
-      ],
+      sender: { name: "Warranty Activation", email: senderEmail },
+      to: [{ email, name: email.split("@")[0] }],
       subject: "Your Warranty Activation OTP",
       textContent: `Your OTP code is: ${code}. It is valid for 10 minutes.`,
       htmlContent: `
@@ -76,64 +69,71 @@ async function sendBrevoEmail(shop, email, code) {
     }),
   });
 
-  const responseData = await response.json();
-
   if (!response.ok) {
-    console.error("Brevo API Error Details:", {
-      status: response.status,
-      statusText: response.statusText,
-      error: responseData,
-    });
+    const errBody = await response.text().catch(() => "");
     throw new Error(
-      `Failed to send email: ${
-        responseData.message || responseData.error || "Unknown error"
-      }`,
+      `Brevo API responded ${response.status}: ${errBody.slice(0, 200)}`
     );
   }
-
-  console.log("Brevo API Response:", responseData);
-  return responseData;
 }
 
-// Create OTP and send using Brevo config for this shop
+// Best-effort cleanup of expired OTPs (cheap; runs alongside writes).
+async function purgeExpired() {
+  try {
+    await prisma.otpToken.deleteMany({
+      where: { expiresAt: { lt: new Date() } },
+    });
+  } catch (err) {
+    console.error("Failed to purge expired OTPs:", err.message);
+  }
+}
+
+// Create OTP, persist it, send email via the shop's Brevo config.
 export async function createOtp({ shop, email }) {
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const token = crypto.randomUUID();
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-  otpMap.set(token, { email, code, expiresAt });
+  await prisma.otpToken.create({
+    data: {
+      token,
+      shop,
+      email,
+      codeHash: hashCode(code),
+      expiresAt,
+    },
+  });
 
-  console.log(`Generated OTP for ${email} (shop: ${shop}): ${code}`);
+  // Fire-and-forget cleanup of expired rows
+  purgeExpired();
 
   try {
     await sendBrevoEmail(shop, email, code);
-    console.log(`✅ OTP email sent to ${email} via Brevo API for shop ${shop}`);
   } catch (err) {
-    console.error("❌ Error sending OTP email via API:", {
-      shop,
-      message: err.message,
-      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
-    });
-
-    // Log OTP so you can debug if email fails
-    console.log(`🔑 OTP for ${email}: ${code} (Token: ${token})`);
-    // Optional: rethrow if you want to fail the request
-    // throw err;
+    // Don't leak the OTP in logs. Log only that delivery failed.
+    console.error(`Failed to send OTP email for shop=${shop}:`, err.message);
+    // Surface the failure so the caller returns a 500 to the storefront.
+    throw err;
   }
 
   return token;
 }
 
-// Verify OTP from in-memory store
-export function verifyOtp(email, token, code) {
-  const record = otpMap.get(token);
+// Verify OTP from Prisma store. Single-use.
+export async function verifyOtp(email, token, code) {
+  if (!email || !token || !code) return false;
+
+  const record = await prisma.otpToken.findUnique({ where: { token } });
   if (!record) return false;
   if (record.email !== email) return false;
-  if (record.expiresAt < Date.now()) {
-    otpMap.delete(token);
+  if (record.expiresAt < new Date()) {
+    await prisma.otpToken.delete({ where: { token } }).catch(() => {});
     return false;
   }
-  const ok = record.code === code;
-  if (ok) otpMap.delete(token);
+
+  const ok = record.codeHash === hashCode(code);
+  if (ok) {
+    await prisma.otpToken.delete({ where: { token } }).catch(() => {});
+  }
   return ok;
 }

@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
 }
 
 model Session {
@@ -46,15 +46,30 @@ model WarrantySettings {
   marketingText      String?
   claimMarketingText String?
 
+  // brevoApiKey and cloudinarySecret are stored AES-256-GCM encrypted
+  // (see app/utils/crypto.server.js). brevoSenderEmail / cloudName /
+  // cloudinaryKey are non-secret identifiers and stored plaintext.
   brevoApiKey      String?
   brevoSenderEmail String?
 
-  cloudName         String?  
-  cloudinaryKey     String?  
-  cloudinarySecret  String?  
+  cloudName         String?
+  cloudinaryKey     String?
+  cloudinarySecret  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
+}
+
+model OtpToken {
+  token     String   @id
+  shop      String
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([shop, email])
+  @@index([expiresAt])
 }
 
 model EmailTemplate {

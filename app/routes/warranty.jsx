@@ -52,7 +52,11 @@ export default function WarrantyPage() {
   const [purchaseSourcesError, setPurchaseSourcesError] = useState(null);
   const [selectedPurchaseSource, setSelectedPurchaseSource] = useState(null);
 
-  const [shopDomain, setShopDomain] = useState("store.myshopify.com"); // Default value, will be overridden by URL param if present
+  const [shopDomain, setShopDomain] = useState(""); // Set from ?shop= URL param
+
+  // Build absolute App Proxy URLs (signed by Shopify)
+  const proxy = (path) =>
+    shopDomain ? `https://${shopDomain}/apps/warranty${path}` : path;
 
   const [marketingText, setMarketingText] = useState("");
   const [marketingTextLoading, setMarketingTextLoading] = useState(true);
@@ -70,9 +74,7 @@ export default function WarrantyPage() {
         setMarketingTextLoading(true);
         setMarketingTextError(null);
 
-        const res = await fetch(
-          `/api/warranty-settings?shop=${encodeURIComponent(shopDomain)}`
-        );
+        const res = await fetch(proxy(`/api/warranty-settings`));
         if (!res.ok) {
           throw new Error("Failed to load marketing text");
         }
@@ -113,9 +115,7 @@ export default function WarrantyPage() {
         setBillingError(null);
         setBillingActive(null); // reset to loading on shop change
 
-        const res = await fetch(
-          `/api/billing-status?shop=${encodeURIComponent(shopDomain)}`
-        );
+        const res = await fetch(proxy(`/api/billing-status`));
         const data = await res.json();
         setBillingActive(!!data.active);
 
@@ -139,9 +139,7 @@ export default function WarrantyPage() {
         setPurchaseSourcesLoading(true);
         setPurchaseSourcesError(null);
 
-        const res = await fetch(
-          `/api/purchase-sources?shop=${encodeURIComponent(shopDomain)}`
-        );
+        const res = await fetch(proxy(`/api/purchase-sources`));
         if (!res.ok) {
           throw new Error("Failed to load purchase sources");
         }
@@ -191,8 +189,12 @@ export default function WarrantyPage() {
     { code: "+353", country: "Ireland", flag: "🇮🇪", isoCode: "IE" },
   ];
 
-  // Ideal Postcodes API Key - Add this at the top with your actual key
-  const IDEAL_POSTCODES_API_KEY = "ak_test"; // Replace with your key from ideal-postcodes.co.uk
+  // Ideal Postcodes API key (UK address autocomplete). When unset, the
+  // form falls back to the OpenStreetMap Nominatim API.
+  // eslint-disable-next-line no-undef
+  const IDEAL_POSTCODES_API_KEY =
+    (typeof window !== "undefined" && window.__IDEAL_POSTCODES_API_KEY__) ||
+    "";
 
   // Fetch countries from better API
   useEffect(() => {
@@ -284,15 +286,12 @@ export default function WarrantyPage() {
   // Fetch products for the Product Name select (now used for typeahead)
   useEffect(() => {
     const fetchProducts = async () => {
+      if (!shopDomain) return;
       try {
         setProductsLoading(true);
         setProductsError(null);
-        const params = new URLSearchParams(window.location.search);
-        const shopFromUrl = params.get("shop");
 
-        const res = await fetch(
-          "/api/products?shop=" + encodeURIComponent(shopFromUrl)
-        );
+        const res = await fetch(proxy(`/api/products`));
         if (!res.ok) {
           throw new Error("Failed to load products");
         }
@@ -307,7 +306,7 @@ export default function WarrantyPage() {
     };
 
     fetchProducts();
-  }, []);
+  }, [shopDomain]);
 
   // Derived: filtered products based on search term
   const filteredProducts = products.filter((product) =>
@@ -318,6 +317,13 @@ export default function WarrantyPage() {
   const searchAddresses = async (query) => {
     setIsSearching(true);
     setShowSuggestions(false);
+
+    // No Ideal Postcodes key configured — go straight to OpenStreetMap
+    if (!IDEAL_POSTCODES_API_KEY) {
+      await searchOpenStreetMap(query);
+      setIsSearching(false);
+      return;
+    }
 
     try {
       const response = await fetch(
@@ -378,7 +384,6 @@ export default function WarrantyPage() {
         {
           headers: {
             "Accept-Language": "en",
-            "User-Agent": "MobitelWarranty/1.0",
           },
         }
       );
@@ -565,10 +570,10 @@ export default function WarrantyPage() {
   async function checkCustomerExists(email) {
     setCheckingCustomer(true);
     try {
-      const res = await fetch("/api/check-customer", {
+      const res = await fetch(proxy(`/api/check-customer`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, shop: shopDomain }),
+        body: JSON.stringify({ email }),
       });
 
       const data = await res.json();
@@ -650,13 +655,10 @@ export default function WarrantyPage() {
     // Customer doesn't exist, proceed with OTP sending
     setStatus("Sending OTP...");
     try {
-      const res = await fetch("/api/send-otp", {
+      const res = await fetch(proxy(`/api/send-otp`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          shop: shopDomain,
-        }),
+        body: JSON.stringify({ email }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -680,7 +682,7 @@ export default function WarrantyPage() {
     setStatusType(null);
     setStatus("Verifying OTP...");
     try {
-      const res = await fetch("/api/verify-otp", {
+      const res = await fetch(proxy(`/api/verify-otp`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp, token: otpToken }),
@@ -757,23 +759,18 @@ export default function WarrantyPage() {
     setStatusType(null);
     setStatus("Submitting warranty...");
     try {
-      const params = new URLSearchParams(window.location.search);
-      const shopFromUrl = params.get("shop");
-      const res = await fetch(
-        `/api/submit-warranty?shop=${encodeURIComponent(shopFromUrl)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      );
+      const res = await fetch(proxy(`/api/submit-warranty`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (res.ok) {
         setStatus("Warranty submitted successfully.");
         setStatusType("success");
         setTimeout(() => {
           window.location.href = `/thankyou?shop=${encodeURIComponent(
-            shopFromUrl
+            shopDomain
           )}`;
         }, 1000);
       } else {

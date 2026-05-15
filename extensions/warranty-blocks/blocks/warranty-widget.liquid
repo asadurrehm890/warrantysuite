@@ -24,11 +24,15 @@
     </div>
   {% endif %}
 
+  {%- assign warranty_form_url = block.settings.app_url | default: 'https://warrantysuite.vercel.app' -%}
   <iframe
-    src="https://warrantysuite.vercel.app/warranty?shop={{ shop.domain }}"
-    title="Warranty Widget"
+    src="{{ warranty_form_url }}/warranty?shop={{ shop.permanent_domain }}"
+    title="Warranty registration form"
     width="100%"
     height="800"
+    loading="lazy"
+    referrerpolicy="origin"
+    sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
     style="border: none;"></iframe>
 
   {% if block.settings.bottom_text != '' %}
@@ -89,6 +93,12 @@
       "id": "bottom_text",
       "label": "apps.warranty_widget.settings.bottom_text.label",
       "default": "<p>Terms and conditions apply.</p>"
+    },
+    {
+      "type": "url",
+      "id": "app_url",
+      "label": "App URL (override)",
+      "info": "Leave blank unless your app is deployed on a custom domain."
     }
   ]
 }

@@ -4,6 +4,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { decryptSecret, encryptSecret } from "../utils/crypto.server";
 
 // DEFAULT text if no DB row exists yet (registration form)
 const DEFAULT_MARKETING_TEXT =
@@ -32,14 +33,14 @@ export const loader = async ({ request }) => {
   const claimMarketingText =
     settings?.claimMarketingText ?? DEFAULT_CLAIM_MARKETING_TEXT;
 
-  // Brevo email configuration (default to empty string if not set)
-  const brevoApiKey = settings?.brevoApiKey ?? "";
+  // Brevo email configuration (decrypt secrets)
+  const brevoApiKey = decryptSecret(settings?.brevoApiKey ?? "");
   const brevoSenderEmail = settings?.brevoSenderEmail ?? "";
 
-  // Cloud config (default to empty string if not set)
+  // Cloud config (decrypt secrets)
   const cloudName = settings?.cloudName ?? "";
   const cloudinaryKey = settings?.cloudinaryKey ?? "";
-  const cloudinarySecret = settings?.cloudinarySecret ?? "";
+  const cloudinarySecret = decryptSecret(settings?.cloudinarySecret ?? "");
 
   return {
     sources,
@@ -160,15 +161,18 @@ export const action = async ({ request }) => {
       return { error: "Please enter a valid sender email address" };
     }
 
+    const encryptedKey = encryptSecret(brevoApiKey);
     const settings = await prisma.warrantySettings.upsert({
       where: { shop },
-      update: { brevoApiKey, brevoSenderEmail },
-      create: { shop, brevoApiKey, brevoSenderEmail },
+      update: { brevoApiKey: encryptedKey, brevoSenderEmail },
+      create: { shop, brevoApiKey: encryptedKey, brevoSenderEmail },
     });
 
     return {
       updatedEmailSettings: {
-        brevoApiKey: settings.brevoApiKey,
+        // Echo back the plaintext value the merchant just submitted —
+        // never echo the ciphertext back to the form.
+        brevoApiKey,
         brevoSenderEmail: settings.brevoSenderEmail,
       },
     };
@@ -194,17 +198,28 @@ export const action = async ({ request }) => {
       return { error: "Cloudinary secret cannot be empty" };
     }
 
+    const encryptedSecret = encryptSecret(cloudinarySecret);
     const settings = await prisma.warrantySettings.upsert({
       where: { shop },
-      update: { cloudName, cloudinaryKey, cloudinarySecret },
-      create: { shop, cloudName, cloudinaryKey, cloudinarySecret },
+      update: {
+        cloudName,
+        cloudinaryKey,
+        cloudinarySecret: encryptedSecret,
+      },
+      create: {
+        shop,
+        cloudName,
+        cloudinaryKey,
+        cloudinarySecret: encryptedSecret,
+      },
     });
 
     return {
       updatedCloudSettings: {
         cloudName: settings.cloudName,
         cloudinaryKey: settings.cloudinaryKey,
-        cloudinarySecret: settings.cloudinarySecret,
+        // Echo back the plaintext value (not the ciphertext).
+        cloudinarySecret,
       },
     };
   }
@@ -905,7 +920,7 @@ export default function WarrantySettingsPage() {
           <s-section heading="Purchase source options">
             <s-paragraph>
               Manage the <s-strong>Purchase Source</s-strong> values that appear
-              in your warranty activation form (for example: Amazon, Mobitel
+              in your warranty activation form (for example: Amazon, Your
               Website, Ebay).
             </s-paragraph>
 
@@ -928,7 +943,7 @@ export default function WarrantySettingsPage() {
                         setLabel(e.target.value);
                         if (error) setError("");
                       }}
-                      placeholder="e.g. Amazon, Mobitel Website, Ebay"
+                      placeholder="e.g. Amazon, Your Website, Ebay"
                       style={{
                         width: "100%",
                         marginTop: "0.5rem",
@@ -1141,86 +1156,235 @@ export default function WarrantySettingsPage() {
             used when sending warranty-related emails.
           </s-paragraph>
 
-          <s-box
-            padding="base"
-            border="small subdued solid"
-            borderRadius="base"
-            background="transparent"
-            style={{ marginTop: "1rem" }}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1fr)",
+              gap: "1rem",
+              marginTop: "1rem",
+              alignItems: "start",
+            }}
           >
-            <form onSubmit={handleSubmitEmailConfig}>
+            {/* LEFT: Email config form */}
+            <s-box
+              padding="base"
+              border="small subdued solid"
+              borderRadius="base"
+              background="transparent"
+            >
+              <form onSubmit={handleSubmitEmailConfig}>
+                <s-stack direction="block" gap="base">
+                  {/* Brevo API Key */}
+                  <div>
+                    <s-text type="strong">Brevo API key</s-text>
+                    <input
+                      type="password"
+                      name="brevoApiKey"
+                      value={brevoApiKey}
+                      onChange={(e) => {
+                        setBrevoApiKey(e.target.value);
+                        if (emailConfigError) setEmailConfigError("");
+                      }}
+                      placeholder="Paste your Brevo API key"
+                      style={{
+                        width: "100%",
+                        marginTop: "0.5rem",
+                        padding: "0.4rem",
+                        borderRadius: "4px",
+                        border:
+                          "1px solid var(--p-color-border-subdued, #d2d5d8)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Brevo Sender Email */}
+                  <div>
+                    <s-text type="strong">Brevo sender email</s-text>
+                    <input
+                      type="email"
+                      name="brevoSenderEmail"
+                      value={brevoSenderEmail}
+                      onChange={(e) => {
+                        setBrevoSenderEmail(e.target.value);
+                        if (emailConfigError) setEmailConfigError("");
+                      }}
+                      placeholder="e.g. no-reply@yourstore.com"
+                      style={{
+                        width: "100%",
+                        marginTop: "0.5rem",
+                        padding: "0.4rem",
+                        borderRadius: "4px",
+                        border:
+                          "1px solid var(--p-color-border-subdued, #d2d5d8)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Error message (if any) */}
+                  {emailConfigError && (
+                    <p
+                      style={{
+                        color: "var(--p-color-critical, #d72c0d)",
+                        marginTop: "0.35rem",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      {emailConfigError}
+                    </p>
+                  )}
+
+                  {/* Submit button */}
+                  <s-button
+                    type="submit"
+                    variant="primary"
+                    {...(isSubmitting ? { loading: true } : {})}
+                    disabled={!brevoApiKey.trim() || !brevoSenderEmail.trim()}
+                  >
+                    Save email configuration
+                  </s-button>
+                </s-stack>
+              </form>
+            </s-box>
+
+            {/* RIGHT: Step-by-step setup guide sidebar */}
+            <s-box
+              padding="base"
+              border="small subdued solid"
+              borderRadius="base"
+              background="transparent"
+            >
               <s-stack direction="block" gap="base">
-                {/* Brevo API Key */}
                 <div>
-                  <s-text type="strong">Brevo API key</s-text>
-                  <input
-                    type="password"
-                    name="brevoApiKey"
-                    value={brevoApiKey}
-                    onChange={(e) => {
-                      setBrevoApiKey(e.target.value);
-                      if (emailConfigError) setEmailConfigError("");
-                    }}
-                    placeholder="Paste your Brevo API key"
+                  <s-text type="strong">Setup guide</s-text>
+                  <s-paragraph
                     style={{
-                      width: "100%",
-                      marginTop: "0.5rem",
-                      padding: "0.4rem",
-                      borderRadius: "4px",
-                      border:
-                        "1px solid var(--p-color-border-subdued, #d2d5d8)",
-                    }}
-                  />
-                </div>
-
-                {/* Brevo Sender Email */}
-                <div>
-                  <s-text type="strong">Brevo sender email</s-text>
-                  <input
-                    type="email"
-                    name="brevoSenderEmail"
-                    value={brevoSenderEmail}
-                    onChange={(e) => {
-                      setBrevoSenderEmail(e.target.value);
-                      if (emailConfigError) setEmailConfigError("");
-                    }}
-                    placeholder="e.g. no-reply@yourstore.com"
-                    style={{
-                      width: "100%",
-                      marginTop: "0.5rem",
-                      padding: "0.4rem",
-                      borderRadius: "4px",
-                      border:
-                        "1px solid var(--p-color-border-subdued, #d2d5d8)",
-                    }}
-                  />
-                </div>
-
-                {/* Error message (if any) */}
-                {emailConfigError && (
-                  <p
-                    style={{
-                      color: "var(--p-color-critical, #d72c0d)",
-                      marginTop: "0.35rem",
-                      fontSize: "0.85rem",
+                      fontSize: "12px",
+                      color: "#666",
+                      marginTop: "4px",
                     }}
                   >
-                    {emailConfigError}
-                  </p>
-                )}
+                    Follow these steps to get your Brevo credentials.
+                  </s-paragraph>
+                </div>
 
-                {/* Submit button */}
-                <s-button
-                  type="submit"
-                  variant="primary"
-                  {...(isSubmitting ? { loading: true } : {})}
-                  disabled={!brevoApiKey.trim() || !brevoSenderEmail.trim()}
+                {/* PART 1: API key */}
+                <div>
+                  <s-text type="strong">Get your Brevo API key</s-text>
+                  <ol
+                    style={{
+                      marginTop: "8px",
+                      paddingLeft: "1.25rem",
+                      fontSize: "13px",
+                      lineHeight: "1.6",
+                      color: "#333",
+                    }}
+                  >
+                    <li>
+                      Create a free account at{" "}
+                      <a
+                        href="https://www.brevo.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#2563eb" }}
+                      >
+                        brevo.com
+                      </a>{" "}
+                      and log in.
+                    </li>
+                    <li>
+                      Click your profile icon (top-right) and choose{" "}
+                      <s-strong>SMTP &amp; API</s-strong>.
+                    </li>
+                    <li>
+                      Open the <s-strong>API Keys</s-strong> tab and click{" "}
+                      <s-strong>Generate a new API key</s-strong>.
+                    </li>
+                    <li>
+                      Give the key a name (e.g.{" "}
+                      <code
+                        style={{
+                          backgroundColor: "#f3f4f6",
+                          padding: "1px 4px",
+                          borderRadius: "3px",
+                          fontSize: "12px",
+                        }}
+                      >
+                        Warranty App
+                      </code>
+                      ) and click <s-strong>Generate</s-strong>.
+                    </li>
+                    <li>
+                      Copy the key immediately and paste it into the{" "}
+                      <s-strong>Brevo API key</s-strong> field on the left.
+                    </li>
+                  </ol>
+                </div>
+
+                {/* PART 2: Sender email */}
+                <div>
+                  <s-text type="strong">Add a verified sender email</s-text>
+                  <ol
+                    style={{
+                      marginTop: "8px",
+                      paddingLeft: "1.25rem",
+                      fontSize: "13px",
+                      lineHeight: "1.6",
+                      color: "#333",
+                    }}
+                  >
+                    <li>
+                      In the Brevo dashboard, go to{" "}
+                      <s-strong>Senders, Domains &amp; Dedicated IPs</s-strong>{" "}
+                      &rarr; <s-strong>Senders</s-strong>.
+                    </li>
+                    <li>
+                      Click <s-strong>Add a sender</s-strong> and fill in the
+                      sender name and email address (e.g.{" "}
+                      <code
+                        style={{
+                          backgroundColor: "#f3f4f6",
+                          padding: "1px 4px",
+                          borderRadius: "3px",
+                          fontSize: "12px",
+                        }}
+                      >
+                        no-reply@yourstore.com
+                      </code>
+                      ).
+                    </li>
+                    <li>
+                      Open the inbox of that email and click the{" "}
+                      <s-strong>verification link</s-strong> Brevo sends you.
+                    </li>
+                    <li>
+                      Once it shows as <s-strong>Verified</s-strong> in Brevo,
+                      copy the address into the{" "}
+                      <s-strong>Brevo sender email</s-strong> field on the left.
+                    </li>
+                    <li>
+                      For best deliverability, also authenticate your domain
+                      (SPF / DKIM) under{" "}
+                      <s-strong>Domains</s-strong> in the same section.
+                    </li>
+                  </ol>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    padding: "8px 10px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    color: "#92400e",
+                  }}
                 >
-                  Save email configuration
-                </s-button>
+                  <s-strong>Tip:</s-strong> The sender email must be verified in
+                  Brevo, otherwise emails will fail to send.
+                </div>
               </s-stack>
-            </form>
-          </s-box>
+            </s-box>
+          </div>
         </s-section>
       )}
 
@@ -1263,113 +1427,235 @@ export default function WarrantySettingsPage() {
             warranty-related features.
           </s-paragraph>
 
-          <s-box
-            padding="base"
-            border="small subdued solid"
-            borderRadius="base"
-            background="transparent"
-            style={{ marginTop: "1rem" }}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 2fr) minmax(280px, 1fr)",
+              gap: "1rem",
+              marginTop: "1rem",
+              alignItems: "start",
+            }}
           >
-            <form onSubmit={handleSubmitCloudConfig}>
+            {/* LEFT: Cloud config form */}
+            <s-box
+              padding="base"
+              border="small subdued solid"
+              borderRadius="base"
+              background="transparent"
+            >
+              <form onSubmit={handleSubmitCloudConfig}>
+                <s-stack direction="block" gap="base">
+                  {/* CLOUDNAME */}
+                  <div>
+                    <s-text type="strong">Cloud name</s-text>
+                    <input
+                      type="text"
+                      name="cloudName"
+                      value={cloudName}
+                      onChange={(e) => {
+                        setCloudName(e.target.value);
+                        if (cloudConfigError) setCloudConfigError("");
+                      }}
+                      placeholder="Your cloud name"
+                      style={{
+                        width: "100%",
+                        marginTop: "0.5rem",
+                        padding: "0.4rem",
+                        borderRadius: "4px",
+                        border:
+                          "1px solid var(--p-color-border-subdued, #d2d5d8)",
+                      }}
+                    />
+                  </div>
+
+                  {/* CLOUDINARY_KEY */}
+                  <div>
+                    <s-text type="strong">Cloudinary key</s-text>
+                    <input
+                      type="text"
+                      name="cloudinaryKey"
+                      value={cloudinaryKey}
+                      onChange={(e) => {
+                        setCloudinaryKey(e.target.value);
+                        if (cloudConfigError) setCloudConfigError("");
+                      }}
+                      placeholder="Your Cloudinary API key"
+                      style={{
+                        width: "100%",
+                        marginTop: "0.5rem",
+                        padding: "0.4rem",
+                        borderRadius: "4px",
+                        border:
+                          "1px solid var(--p-color-border-subdued, #d2d5d8)",
+                      }}
+                    />
+                  </div>
+
+                  {/* CLOUDINARY_SECRET */}
+                  <div>
+                    <s-text type="strong">Cloudinary secret</s-text>
+                    <input
+                      type="password"
+                      name="cloudinarySecret"
+                      value={cloudinarySecret}
+                      onChange={(e) => {
+                        setCloudinarySecret(e.target.value);
+                        if (cloudConfigError) setCloudConfigError("");
+                      }}
+                      placeholder="Your Cloudinary API secret"
+                      style={{
+                        width: "100%",
+                        marginTop: "0.5rem",
+                        padding: "0.4rem",
+                        borderRadius: "4px",
+                        border:
+                          "1px solid var(--p-color-border-subdued, #d2d5d8)",
+                      }}
+                    />
+                  </div>
+
+                  {/* Error message (if any) */}
+                  {cloudConfigError && (
+                    <p
+                      style={{
+                        color: "var(--p-color-critical, #d72c0d)",
+                        marginTop: "0.35rem",
+                        fontSize: "0.85rem",
+                      }}
+                    >
+                      {cloudConfigError}
+                    </p>
+                  )}
+
+                  {/* Submit button */}
+                  <s-button
+                    type="submit"
+                    variant="primary"
+                    {...(isSubmitting ? { loading: true } : {})}
+                    disabled={
+                      !cloudName.trim() ||
+                      !cloudinaryKey.trim() ||
+                      !cloudinarySecret.trim()
+                    }
+                  >
+                    Save cloud configuration
+                  </s-button>
+                </s-stack>
+              </form>
+            </s-box>
+
+            {/* RIGHT: Step-by-step setup guide sidebar */}
+            <s-box
+              padding="base"
+              border="small subdued solid"
+              borderRadius="base"
+              background="transparent"
+            >
               <s-stack direction="block" gap="base">
-                {/* CLOUDNAME */}
                 <div>
-                  <s-text type="strong">Cloud name</s-text>
-                  <input
-                    type="text"
-                    name="cloudName"
-                    value={cloudName}
-                    onChange={(e) => {
-                      setCloudName(e.target.value);
-                      if (cloudConfigError) setCloudConfigError("");
-                    }}
-                    placeholder="Your cloud name"
+                  <s-text type="strong">Setup guide</s-text>
+                  <s-paragraph
                     style={{
-                      width: "100%",
-                      marginTop: "0.5rem",
-                      padding: "0.4rem",
-                      borderRadius: "4px",
-                      border:
-                        "1px solid var(--p-color-border-subdued, #d2d5d8)",
-                    }}
-                  />
-                </div>
-
-                {/* CLOUDINARY_KEY */}
-                <div>
-                  <s-text type="strong">Cloudinary key</s-text>
-                  <input
-                    type="text"
-                    name="cloudinaryKey"
-                    value={cloudinaryKey}
-                    onChange={(e) => {
-                      setCloudinaryKey(e.target.value);
-                      if (cloudConfigError) setCloudConfigError("");
-                    }}
-                    placeholder="Your Cloudinary API key"
-                    style={{
-                      width: "100%",
-                      marginTop: "0.5rem",
-                      padding: "0.4rem",
-                      borderRadius: "4px",
-                      border:
-                        "1px solid var(--p-color-border-subdued, #d2d5d8)",
-                    }}
-                  />
-                </div>
-
-                {/* CLOUDINARY_SECRET */}
-                <div>
-                  <s-text type="strong">Cloudinary secret</s-text>
-                  <input
-                    type="password"
-                    name="cloudinarySecret"
-                    value={cloudinarySecret}
-                    onChange={(e) => {
-                      setCloudinarySecret(e.target.value);
-                      if (cloudConfigError) setCloudConfigError("");
-                    }}
-                    placeholder="Your Cloudinary API secret"
-                    style={{
-                      width: "100%",
-                      marginTop: "0.5rem",
-                      padding: "0.4rem",
-                      borderRadius: "4px",
-                      border:
-                        "1px solid var(--p-color-border-subdued, #d2d5d8)",
-                    }}
-                  />
-                </div>
-
-                {/* Error message (if any) */}
-                {cloudConfigError && (
-                  <p
-                    style={{
-                      color: "var(--p-color-critical, #d72c0d)",
-                      marginTop: "0.35rem",
-                      fontSize: "0.85rem",
+                      fontSize: "12px",
+                      color: "#666",
+                      marginTop: "4px",
                     }}
                   >
-                    {cloudConfigError}
-                  </p>
-                )}
+                    Follow these steps to get your Cloudinary credentials.
+                  </s-paragraph>
+                </div>
 
-                {/* Submit button */}
-                <s-button
-                  type="submit"
-                  variant="primary"
-                  {...(isSubmitting ? { loading: true } : {})}
-                  disabled={
-                    !cloudName.trim() ||
-                    !cloudinaryKey.trim() ||
-                    !cloudinarySecret.trim()
-                  }
+                {/* PART 1: Create account */}
+                <div>
+                  <s-text type="strong">Create a Cloudinary account</s-text>
+                  <ol
+                    style={{
+                      marginTop: "8px",
+                      paddingLeft: "1.25rem",
+                      fontSize: "13px",
+                      lineHeight: "1.6",
+                      color: "#333",
+                    }}
+                  >
+                    <li>
+                      Sign up for a free account at{" "}
+                      <a
+                        href="https://cloudinary.com/users/register_free"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "#2563eb" }}
+                      >
+                        cloudinary.com
+                      </a>
+                      .
+                    </li>
+                    <li>
+                      Verify your email and complete the onboarding wizard.
+                    </li>
+                    <li>
+                      You will land on the Cloudinary{" "}
+                      <s-strong>Console / Dashboard</s-strong>.
+                    </li>
+                  </ol>
+                </div>
+
+                {/* PART 2: Get credentials */}
+                <div>
+                  <s-text type="strong">
+                    Find your Cloud name, API key &amp; secret
+                  </s-text>
+                  <ol
+                    style={{
+                      marginTop: "8px",
+                      paddingLeft: "1.25rem",
+                      fontSize: "13px",
+                      lineHeight: "1.6",
+                      color: "#333",
+                    }}
+                  >
+                    <li>
+                      In the Cloudinary console, open{" "}
+                      <s-strong>Settings</s-strong> (gear icon) &rarr;{" "}
+                      <s-strong>API Keys</s-strong>.
+                    </li>
+                    <li>
+                      Copy the value labeled{" "}
+                      <s-strong>Cloud name</s-strong> and paste it into the{" "}
+                      <s-strong>Cloud name</s-strong> field on the left.
+                    </li>
+                    <li>
+                      Copy the <s-strong>API Key</s-strong> and paste it into
+                      the <s-strong>Cloudinary key</s-strong> field.
+                    </li>
+                    <li>
+                      Click <s-strong>Reveal</s-strong> next to the{" "}
+                      <s-strong>API Secret</s-strong>, copy it, and paste it
+                      into the <s-strong>Cloudinary secret</s-strong> field.
+                    </li>
+                    <li>
+                      Click <s-strong>Save cloud configuration</s-strong> to
+                      store the credentials.
+                    </li>
+                  </ol>
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: "#fffbeb",
+                    border: "1px solid #fde68a",
+                    padding: "8px 10px",
+                    borderRadius: "4px",
+                    fontSize: "12px",
+                    color: "#92400e",
+                  }}
                 >
-                  Save cloud configuration
-                </s-button>
+                  <s-strong>Security tip:</s-strong> Treat the API secret like
+                  a password &mdash; never share it publicly or commit it to
+                  source control.
+                </div>
               </s-stack>
-            </form>
-          </s-box>
+            </s-box>
+          </div>
         </s-section>
       )}
     </s-page>

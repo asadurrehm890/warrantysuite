@@ -19,11 +19,26 @@ api_version = "2026-04"
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 
+  # Mandatory GDPR / privacy compliance webhooks (separate config block —
+  # these topics are NOT subscribed via [[webhooks.subscriptions]]).
+  [webhooks.privacy_compliance]
+  customer_deletion_url = "/webhooks/customers/redact"
+  customer_data_request_url = "/webhooks/customers/data_request"
+  shop_deletion_url = "/webhooks/shop/redact"
+
 [access_scopes]
 scopes = "write_products,write_customers,write_metaobjects,write_metaobject_definitions,write_files"
 
 [auth]
 redirect_urls = [ "https://warrantysuite.vercel.app/api/auth" ]
+
+# App Proxy: lets the storefront call our app via signed requests at
+# https://<shop>.myshopify.com/apps/warranty/* — Shopify forwards them to
+# our app with a signature we verify with `authenticate.public.appProxy`.
+[app_proxy]
+url = "https://warrantysuite.vercel.app"
+prefix = "apps"
+subpath = "warranty"
 
 # Metaobject definition: $app:warranty_registration
 [metaobjects.app.warranty_registration]

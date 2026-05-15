@@ -1,45 +1,38 @@
+// app/routes/api.billing-status.jsx
+// Storefront endpoint — called via App Proxy.
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { getBillingStatus } from "../utils/billing.server";
+import { proxyEndpoint } from "../utils/proxyEndpoint.server";
 
-export const loader = async ({ request }) => {
-  const url = new URL(request.url);
-  const shop = url.searchParams.get("shop");
+const PLAN_NAME = "Warranty Activation Suite - Annual Plan";
 
-  if (!shop) {
-    return new Response(
-      JSON.stringify({ error: "Missing shop parameter", active: false }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+const CURRENT_SUBSCRIPTION_QUERY = `#graphql
+  query CurrentAppSubscription {
+    currentAppInstallation {
+      activeSubscriptions {
+        id
+        name
+        status
+      }
+    }
   }
+`;
 
+export const loader = proxyEndpoint(async ({ admin }) => {
   try {
-    const status = await getBillingStatus(shop);
-
-    return new Response(JSON.stringify(status), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("Error checking billing status:", error);
-    // Fail-safe: treat as not active if we can't verify
-    return new Response(
-      JSON.stringify({
-        active: false,
-        error: "Unable to verify billing status",
-      }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
+    const res = await admin.graphql(CURRENT_SUBSCRIPTION_QUERY);
+    const json = await res.json();
+    const subs = json.data?.currentAppInstallation?.activeSubscriptions ?? [];
+    const active = subs.some(
+      (s) => s.status === "ACTIVE" && s.name === PLAN_NAME
     );
+    return { active };
+  } catch (error) {
+    console.error("Error checking billing status:", error.message);
+    return { active: false, error: "Unable to verify billing status" };
   }
-};
+});
 
 export default function BillingStatusApiRoute() {
-  // Not used; this is a data endpoint only.
   return null;
 }
 

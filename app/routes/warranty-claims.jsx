@@ -24,7 +24,11 @@ export default function WarrantyClaimPage() {
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
-  const [shopDomain, setShopDomain] = useState("store.myshopify.com");
+  const [shopDomain, setShopDomain] = useState("");
+
+  // Build absolute App Proxy URLs (signed by Shopify)
+  const proxy = (path) =>
+    shopDomain ? `https://${shopDomain}/apps/warranty${path}` : path;
 
   // NEW: claim marketing text (default matches admin default)
   const [claimMarketingText, setClaimMarketingText] = useState(
@@ -122,9 +126,7 @@ export default function WarrantyClaimPage() {
         setBillingError(null);
         setBillingActive(null); // reset to loading
 
-        const res = await fetch(
-          `/api/billing-status?shop=${encodeURIComponent(shopDomain)}`
-        );
+        const res = await fetch(proxy(`/api/billing-status`));
         const data = await res.json();
         setBillingActive(!!data.active);
 
@@ -147,9 +149,7 @@ export default function WarrantyClaimPage() {
       if (!shopDomain) return;
 
       try {
-        const res = await fetch(
-          `/api/warranty-settings?shop=${encodeURIComponent(shopDomain)}`
-        );
+        const res = await fetch(proxy(`/api/warranty-settings`));
         if (!res.ok) {
           console.warn("Failed to load warranty settings");
           return;
@@ -177,9 +177,7 @@ export default function WarrantyClaimPage() {
         setWarrantiesError(null);
 
         const res = await fetch(
-          `/api/customer-warranties?email=${encodeURIComponent(
-            email
-          )}&shop=${encodeURIComponent(shopDomain)}`
+          proxy(`/api/customer-warranties?email=${encodeURIComponent(email)}`)
         );
 
         if (!res.ok) {
@@ -349,12 +347,11 @@ export default function WarrantyClaimPage() {
       const file = files[i];
       const formData = new FormData();
       formData.append("files", file);
-      formData.append("shop", shopDomain);
 
       try {
         setUploadProgress((prev) => ({ ...prev, [file.name]: 10 }));
 
-        const res = await fetch("/api/upload-claim-files", {
+        const res = await fetch(proxy(`/api/upload-claim-files`), {
           method: "POST",
           body: formData,
         });
@@ -405,7 +402,7 @@ export default function WarrantyClaimPage() {
     setStatusType(null);
     setStatus("Sending OTP...");
     try {
-      const res = await fetch("/api/send-otp", {
+      const res = await fetch(proxy(`/api/send-otp`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -432,7 +429,7 @@ export default function WarrantyClaimPage() {
     setStatusType(null);
     setStatus("Verifying OTP...");
     try {
-      const res = await fetch("/api/verify-otp", {
+      const res = await fetch(proxy(`/api/verify-otp`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp, token: otpToken }),
@@ -524,16 +521,11 @@ export default function WarrantyClaimPage() {
 
       setStatus("Submitting claim...");
 
-      const res = await fetch(
-        `/api/submit-warranty-claim?shop=${encodeURIComponent(
-          shopDomain
-        )}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(claimData),
-        }
-      );
+      const res = await fetch(proxy(`/api/submit-warranty-claim`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(claimData),
+      });
 
       const data = await res.json();
 

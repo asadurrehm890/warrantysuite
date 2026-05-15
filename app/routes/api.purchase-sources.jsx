@@ -1,21 +1,12 @@
 // app/routes/api.purchase-sources.jsx
+// Storefront endpoint — called via App Proxy.
 import prisma from "../db.server";
+import { proxyEndpoint } from "../utils/proxyEndpoint.server";
 
-// GET /api/purchase-sources?shop=checkcos.myshopify.com
-export async function loader({ request }) {
-  const url = new URL(request.url);
-  const shopParam = url.searchParams.get("shop");
-
-  // You can require shopParam or fall back to a default
-  const shopDomain = shopParam;
-
+export const loader = proxyEndpoint(async ({ session }) => {
   const sources = await prisma.purchaseSource.findMany({
-    where: { shop: shopDomain },
+    where: { shop: session.shop },
     orderBy: { createdAt: "asc" },
   });
-
-  return new Response(JSON.stringify({ sources }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+  return { sources };
+});

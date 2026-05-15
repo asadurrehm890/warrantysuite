@@ -88,11 +88,10 @@ export const action = async ({ request }) => {
     };
   }
 
-  // For React Router actions, you can return a redirect Response:
-  return new Response(null, {
-    status: 302,
-    headers: { Location: confirmationUrl },
-  });
+  // Don't return a 302 here — the embedded app iframe would try to load
+  // Shopify's billing approval page inline and get blocked by frame-ancestors.
+  // Hand the URL back to the client so App Bridge can do a top-level redirect.
+  return { ok: true, confirmationUrl };
 };
 
 export default function BillingPage() {
@@ -103,12 +102,22 @@ export default function BillingPage() {
 
   const isSubmitting = navigation.state === "submitting";
 
-  // Optional: show a toast if there was an error
+  // Show a toast on error
   useEffect(() => {
     if (actionData?.ok === false && actionData.error && shopify?.toast?.show) {
       shopify.toast.show(actionData.error);
     }
   }, [actionData, shopify]);
+
+  // Break out of the embedded iframe and send the merchant to Shopify's
+  // billing approval page at the top level.
+  useEffect(() => {
+    if (actionData?.ok && actionData.confirmationUrl) {
+      if (typeof window !== "undefined") {
+        window.open(actionData.confirmationUrl, "_top");
+      }
+    }
+  }, [actionData]);
 
   return (
     <s-page heading="Billing">

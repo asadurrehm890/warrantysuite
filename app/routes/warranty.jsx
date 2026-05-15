@@ -829,7 +829,7 @@ export default function WarrantyPage() {
       )}
 
       {/* Billing active - show the full warranty form */}
-      {billingActive === true && (
+      {billingActive === false && (
         <section className="warranty-section">
           <form className="warranty-form" onSubmit={handleSubmit}>
             <div className="email-verification-section fulllwwidth">

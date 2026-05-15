@@ -19,6 +19,7 @@ export default function App() {
         <s-link href="/app/warranty-listing">Warranty Listing</s-link>
         <s-link href="/app/claim-warranties">Claim Warranties</s-link>
         <s-link href="/app/warranty-settings">Warranty Configuration</s-link>      
+        <s-link href="/app/billing">Warranty Billing</s-link>      
       </s-app-nav>
       <Outlet />
     </AppProvider>

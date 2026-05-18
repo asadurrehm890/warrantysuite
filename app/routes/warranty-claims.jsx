@@ -35,6 +35,11 @@ export default function WarrantyClaimPage() {
     "Keep me updated on my claim status via email"
   );
 
+  // Billing status state
+  // null = loading, true = active subscription, false = not active
+  const [billingActive, setBillingActive] = useState(null);
+  const [billingError, setBillingError] = useState(null);
+
   // Cloudinary Free Plan Limits
   const CLOUDINARY_LIMITS = {
     MAX_FILE_SIZE: 1 * 1024 * 1024, // 10MB
@@ -111,6 +116,32 @@ export default function WarrantyClaimPage() {
       console.warn("Could not read shop from URL, using default", e);
     }
   }, []);
+
+  // Check billing status for this shop
+  useEffect(() => {
+    const checkBilling = async () => {
+      if (!shopDomain) return;
+
+      try {
+        setBillingError(null);
+        setBillingActive(null);
+
+        const res = await fetch(proxy(`/api/billing-status`));
+        const data = await res.json();
+        setBillingActive(!!data.active);
+
+        if (!data.active && data.error) {
+          setBillingError(data.error);
+        }
+      } catch (err) {
+        console.error("Error checking billing status:", err);
+        setBillingActive(false);
+        setBillingError("Unable to verify store subscription.");
+      }
+    };
+
+    checkBilling();
+  }, [shopDomain]);
 
   // NEW: fetch warranty settings (including claim marketing text)
   useEffect(() => {
@@ -546,7 +577,30 @@ export default function WarrantyClaimPage() {
 
   return (
     <main className="warranty-claim-page">
-      <section className="warranty-claim-section">
+      {billingActive === null && (
+        <section className="warranty-claim-section">
+          <p>Checking store subscription status...</p>
+        </section>
+      )}
+
+      {billingActive === false && (
+        <section className="warranty-claim-section">
+          <h2>Warranty claim form is not available</h2>
+          <p>
+            This store does not have an active subscription to the Warranty
+            Activation Suite. Please contact the store owner if you believe this is
+            an error.
+          </p>
+          {billingError && (
+            <div className="warranty-claim-status warranty-claim-status--error">
+              {billingError}
+            </div>
+          )}
+        </section>
+      )}
+
+      {billingActive === true && (
+        <section className="warranty-claim-section">
           <form className="warranty-claim-form" onSubmit={handleSubmit}>
             {/* Email Verification Section */}
             <div className="email-verification-section">
@@ -933,6 +987,7 @@ export default function WarrantyClaimPage() {
             )}
           </form>
         </section>
+      )}
     </main>
   );
 }

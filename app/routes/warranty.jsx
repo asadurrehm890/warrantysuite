@@ -62,6 +62,11 @@ export default function WarrantyPage() {
   const [marketingTextLoading, setMarketingTextLoading] = useState(true);
   const [marketingTextError, setMarketingTextError] = useState(null);
 
+  // Billing status states
+  // null = loading, true = active subscription, false = no active subscription
+  const [billingActive, setBillingActive] = useState(null);
+  const [billingError, setBillingError] = useState(null);
+
   // Fetch marketing consent text
   useEffect(() => {
     const fetchMarketingText = async () => {
@@ -100,6 +105,32 @@ export default function WarrantyPage() {
       console.warn("Could not read shop from URL, using default", e);
     }
   }, []);
+
+  // Check billing status for this shop
+  useEffect(() => {
+    const checkBilling = async () => {
+      if (!shopDomain) return;
+
+      try {
+        setBillingError(null);
+        setBillingActive(null);
+
+        const res = await fetch(proxy(`/api/billing-status`));
+        const data = await res.json();
+        setBillingActive(!!data.active);
+
+        if (!data.active && data.error) {
+          setBillingError(data.error);
+        }
+      } catch (err) {
+        console.error("Error checking billing status:", err);
+        setBillingActive(false);
+        setBillingError("Unable to verify store subscription.");
+      }
+    };
+
+    checkBilling();
+  }, [shopDomain]);
 
   // Fetch purchase sources for this shop
   useEffect(() => {
@@ -773,7 +804,30 @@ export default function WarrantyPage() {
 
   return (
     <main className="warranty-page">
-      <section className="warranty-section">
+      {billingActive === null && (
+        <section className="warranty-section">
+          <p>Checking store subscription status...</p>
+        </section>
+      )}
+
+      {billingActive === false && (
+        <section className="warranty-section">
+          <h2>Warranty registration is not available</h2>
+          <p>
+            This store does not have an active subscription to the Warranty
+            Activation Suite. Please contact the store owner if you believe this is
+            a mistake.
+          </p>
+          {billingError && (
+            <p className="warranty-status warranty-status--error">
+              {billingError}
+            </p>
+          )}
+        </section>
+      )}
+
+      {billingActive === true && (
+        <section className="warranty-section">
           <form className="warranty-form" onSubmit={handleSubmit}>
             <div className="email-verification-section fulllwwidth">
               {!emailVerified && (
@@ -1223,6 +1277,7 @@ export default function WarrantyPage() {
             </p>
           )}
         </section>
+      )}
     </main>
   );
 }
